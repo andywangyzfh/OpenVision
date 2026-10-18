@@ -3,6 +3,14 @@ import XCTest
 @testable import SubscriptionCore
 
 final class SubscriptionCoreTests: XCTestCase {
+    func testProductionHTTPTransportDoesNotRetainURLLoadingState() {
+        let configuration = PlanHTTPTransport.session.configuration
+        XCTAssertNil(configuration.urlCache)
+        XCTAssertNil(configuration.httpCookieStorage)
+        XCTAssertFalse(configuration.httpShouldSetCookies)
+        XCTAssertNil(configuration.urlCredentialStorage)
+        XCTAssertEqual(configuration.requestCachePolicy, .reloadIgnoringLocalCacheData)
+    }
     func testAuthorizationAndPKCEContract() throws {
         let a = SignInAttempt(hostID: "urn:uuid:test", port: 1455)
         let values = Dictionary(uniqueKeysWithValues: URLComponents(url: a.authorizationURL, resolvingAgainstBaseURL: false)!.queryItems!.map { ($0.name, $0.value!) })

@@ -21,7 +21,7 @@ if ! xcodebuild -checkFirstLaunchStatus > .test-results/xcode-first-launch.txt 2
   exit 2
 fi
 xcodegen generate --spec MVP/project.yml
-device_id="$(xcrun simctl list devices available -j | /usr/bin/python3 -c 'import json,sys; d=json.load(sys.stdin); p=[x for v in d["devices"].values() for x in v if x.get("isAvailable") and x["name"].startswith("iPhone")]; print(p[0]["udid"] if p else "")')"
+device_id="${MVP_SIMULATOR_ID:-$(xcrun simctl list devices available -j | /usr/bin/python3 -c 'import json,sys; d=json.load(sys.stdin); p=[x for v in d["devices"].values() for x in v if x.get("isAvailable") and x["name"].startswith("iPhone")]; print(p[0]["udid"] if p else "")')}"
 if [ -z "$device_id" ]; then
   echo 'BLOCKED: install an iPhone iOS simulator runtime in Xcode Settings > Components.' >&2
   exit 2
@@ -30,7 +30,8 @@ echo "$device_id" > .test-results/simulator-destination.txt
 result_path="$project_root/.test-results/MVP-$(date +%Y%m%d-%H%M%S).xcresult"
 xcodebuild test -project MVP/OpenVisionMVP.xcodeproj -scheme OpenVisionMVP \
   -destination "platform=iOS Simulator,id=$device_id" \
-  -derivedDataPath .local-build/ios -clonedSourcePackagesDirPath .local-build/packages \
+  -derivedDataPath "${MVP_BUILD_ROOT:-.local-build}/ios" -clonedSourcePackagesDirPath "${MVP_BUILD_ROOT:-.local-build}/packages" \
+  -parallel-testing-enabled NO \
   -resultBundlePath "$result_path" \
   CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
   | tee .test-results/ios-tests.txt

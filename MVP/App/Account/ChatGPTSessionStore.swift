@@ -105,7 +105,7 @@ actor ChatGPTSessionStore {
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             request.httpBody = Self.form(["token": refreshToken, "token_type_hint": "refresh_token", "client_id": old.clientID])
             request.timeoutInterval = 15
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await PlanHTTPTransport.session.data(for: request)
             return (response as? HTTPURLResponse)?.statusCode == 200
         } catch { return false }
     }
@@ -114,7 +114,7 @@ actor ChatGPTSessionStore {
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = form(values); request.timeoutInterval = 30
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await PlanHTTPTransport.session.data(for: request)
         guard let status = (response as? HTTPURLResponse)?.statusCode else { throw PlanError.service("network_error") }
         guard (200...299).contains(status) else { throw SubscriptionContract.tokenError(status: status, data: data) }
         return try JSONDecoder().decode(TokenReply.self, from: data)

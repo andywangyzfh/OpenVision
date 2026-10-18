@@ -20,6 +20,11 @@ func feed(_ payloads: [String]) throws -> String {
 }
 
 let attempt = SignInAttempt(hostID: "urn:uuid:test", port: 54321)
+let transportConfiguration = PlanHTTPTransport.session.configuration
+try check("production HTTP transport retains no cache/cookie/credential store", transportConfiguration.urlCache == nil
+    && transportConfiguration.httpCookieStorage == nil && !transportConfiguration.httpShouldSetCookies
+    && transportConfiguration.urlCredentialStorage == nil
+    && transportConfiguration.requestCachePolicy == .reloadIgnoringLocalCacheData)
 let values = Dictionary(uniqueKeysWithValues: URLComponents(url: attempt.authorizationURL, resolvingAgainstBaseURL: false)!.queryItems!.map { ($0.name, $0.value!) })
 try check("new dynamic registration", values["client_id"] == "dynamic_agent_client")
 try check("numeric loopback callback", values["redirect_uri"] == "http://127.0.0.1:54321/auth/callback")

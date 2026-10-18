@@ -9,13 +9,13 @@ actor ChatGPTPlanClient {
     private let invalidateToken: TokenInvalidator
 
     init(account: ChatGPTAccountService) {
-        session = .shared
+        session = PlanHTTPTransport.session
         tokenSupplier = { try await ChatGPTSessionStore.shared.accessToken() }
         invalidateToken = { await ChatGPTSessionStore.shared.discardIfMatching($0) }
     }
 
     /// Inject an isolated transport and app-owned token operations for offline integration tests.
-    /// The production initializer above retains the shared URLSession/Keychain-backed behavior.
+    /// The production initializer uses a cacheless ephemeral session and Keychain-backed tokens.
     init(session: URLSession, tokenSupplier: @escaping TokenSupplier, invalidateToken: @escaping TokenInvalidator) {
         self.session = session
         self.tokenSupplier = tokenSupplier

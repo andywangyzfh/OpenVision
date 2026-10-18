@@ -11,7 +11,7 @@ public enum IDTokenVerifier {
         public let revocation_endpoint: URL?
     }
     public static func discovery() async throws -> Discovery {
-        let (data, response) = try await URLSession.shared.data(from: URL(string: SubscriptionContract.issuer + "/.well-known/openid-configuration")!)
+        let (data, response) = try await PlanHTTPTransport.session.data(from: URL(string: SubscriptionContract.issuer + "/.well-known/openid-configuration")!)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PlanError.invalidIdentity }
         let metadata = try JSONDecoder().decode(Discovery.self, from: data)
         guard metadata.issuer == SubscriptionContract.issuer, trusted(metadata.jwks_uri),
@@ -23,7 +23,7 @@ public enum IDTokenVerifier {
     }
     public static func verify(_ token: String, clientID: String, nonce: String?) async throws -> [String: Any] {
         let metadata = try await discovery()
-        let (keysData, response) = try await URLSession.shared.data(from: metadata.jwks_uri)
+        let (keysData, response) = try await PlanHTTPTransport.session.data(from: metadata.jwks_uri)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PlanError.invalidIdentity }
         return try verify(token, clientID: clientID, nonce: nonce, jwks: keysData)
     }
