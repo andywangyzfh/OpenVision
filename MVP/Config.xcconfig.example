@@ -1,0 +1,5 @@
+// Optional local signing/configuration. Pass these as xcodebuild settings or select Team in Xcode.
+// Do not commit real credentials. Developer Mode uses MetaAppID=0; no client token is required.
+DEVELOPMENT_TEAM =
+META_APP_ID = 0
+CLIENT_TOKEN =

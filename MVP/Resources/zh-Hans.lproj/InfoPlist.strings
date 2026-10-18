@@ -1,0 +1,4 @@
+"NSMicrophoneUsageDescription" = "使用你明确选择的麦克风收听问题。";
+"NSSpeechRecognitionUsageDescription" = "将中文或英文问题转为文字，交给助手回答。";
+"NSBluetoothAlwaysUsageDescription" = "连接 Meta 眼镜，用于按需拍照和音频。";
+"NSLocalNetworkUsageDescription" = "通过 Wi-Fi 连接眼镜，并在本机完成登录回调。";

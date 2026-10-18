@@ -1,0 +1,566 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		06D04DDB98EF3BC379BEB94F /* OpenVisionCore in Frameworks */ = {isa = PBXBuildFile; productRef = 88966C0F474379C7F400BE96 /* OpenVisionCore */; };
+		0CE9FD075E3B0C546B0D25E5 /* ChatGPTPlanClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EFA66F1F5BE6BC1BCB8E3A /* ChatGPTPlanClient.swift */; };
+		10346EBB7843649DD9EED220 /* SubscriptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1FF8435369AE7F3174143341 /* SubscriptionCore */; };
+		188FF933030E40FA7C38D872 /* SpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C87770A63FF9D18C046BDB /* SpeechService.swift */; };
+		25418324F370848C0455820D /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 6C06A302932E411E594D3AD2 /* InfoPlist.strings */; };
+		4049E01B979FC0485C0EC465 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 29679E824E140F95B7C8AF4F /* MWDATCamera */; };
+		60BD1F21597574363B031D2D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F004EA4E917AF1EAA0C649 /* ContentView.swift */; };
+		6DBE984BB58E887DCEC805F1 /* ChatGPTAccountService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */; };
+		90991D22B1EED8F773ACEB5C /* ChatGPTSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB58F81914B19E854E5281F7 /* ChatGPTSessionStore.swift */; };
+		96E989B69871659CA97AB519 /* MVPFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA4AD53B890DDCFE01B81D4 /* MVPFlowTests.swift */; };
+		A3F4EB16B08EF16D55BB8287 /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157BAF3B9820F1865EE97A69 /* ConversationViewModel.swift */; };
+		AF54FFD30E12F6946805B85D /* GlassesPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D2D738463E55C65525815B /* GlassesPhotoService.swift */; };
+		D31C32FC356A4524976B5781 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = C821CD0020A5847A2777DC03 /* MWDATCore */; };
+		E79309BE642DD80E63934159 /* OpenVisionMVPApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB03B328D3F7D0454691676 /* OpenVisionMVPApp.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E27BB6CE9083481EC87C9630 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0046DF54E17E63C99DF0A0CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 33398CCAD34830DD4401D99C;
+			remoteInfo = OpenVisionMVP;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		00C87770A63FF9D18C046BDB /* SpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechService.swift; sourceTree = "<group>"; };
+		157BAF3B9820F1865EE97A69 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
+		15ACD63A20DB81172E5231B7 /* Subscription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Subscription; path = Subscription; sourceTree = SOURCE_ROOT; };
+		1EA4AD53B890DDCFE01B81D4 /* MVPFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MVPFlowTests.swift; sourceTree = "<group>"; };
+		20EFA66F1F5BE6BC1BCB8E3A /* ChatGPTPlanClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTPlanClient.swift; sourceTree = "<group>"; };
+		3EB03B328D3F7D0454691676 /* OpenVisionMVPApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenVisionMVPApp.swift; sourceTree = "<group>"; };
+		53D2D738463E55C65525815B /* GlassesPhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassesPhotoService.swift; sourceTree = "<group>"; };
+		7547994D7C92B486BDB05A28 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Core; sourceTree = SOURCE_ROOT; };
+		9006AFA19A1993A3227CF96D /* OpenVisionMVP.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenVisionMVP.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		90F004EA4E917AF1EAA0C649 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B4555963A1FC7F3FFFD13FF6 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTAccountService.swift; sourceTree = "<group>"; };
+		E7F935363771A343E3E36A08 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		E9DD6BB35A33AA4F52EC7F7C /* OpenVisionMVPUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenVisionMVPUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FB58F81914B19E854E5281F7 /* ChatGPTSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTSessionStore.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2356B199BB9B2030348A1F42 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06D04DDB98EF3BC379BEB94F /* OpenVisionCore in Frameworks */,
+				10346EBB7843649DD9EED220 /* SubscriptionCore in Frameworks */,
+				D31C32FC356A4524976B5781 /* MWDATCore in Frameworks */,
+				4049E01B979FC0485C0EC465 /* MWDATCamera in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		299AAD71AB2C853246B5362F /* Account */ = {
+			isa = PBXGroup;
+			children = (
+				C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */,
+				20EFA66F1F5BE6BC1BCB8E3A /* ChatGPTPlanClient.swift */,
+				FB58F81914B19E854E5281F7 /* ChatGPTSessionStore.swift */,
+			);
+			path = Account;
+			sourceTree = "<group>";
+		};
+		4C2CC0A19E374EE68A55BB46 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				7547994D7C92B486BDB05A28 /* Core */,
+				15ACD63A20DB81172E5231B7 /* Subscription */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		77384E3AD9CADBA84915F331 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9006AFA19A1993A3227CF96D /* OpenVisionMVP.app */,
+				E9DD6BB35A33AA4F52EC7F7C /* OpenVisionMVPUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8FF027713D604195C2AA47C8 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				1EA4AD53B890DDCFE01B81D4 /* MVPFlowTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		E8904A76C10E2A384ABCF892 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				6C06A302932E411E594D3AD2 /* InfoPlist.strings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		F192F5D1B0DE3FEF84EB9464 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				90F004EA4E917AF1EAA0C649 /* ContentView.swift */,
+				157BAF3B9820F1865EE97A69 /* ConversationViewModel.swift */,
+				53D2D738463E55C65525815B /* GlassesPhotoService.swift */,
+				3EB03B328D3F7D0454691676 /* OpenVisionMVPApp.swift */,
+				00C87770A63FF9D18C046BDB /* SpeechService.swift */,
+				299AAD71AB2C853246B5362F /* Account */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		F54D9D6BAF64CF230F5A0D63 = {
+			isa = PBXGroup;
+			children = (
+				F192F5D1B0DE3FEF84EB9464 /* App */,
+				4C2CC0A19E374EE68A55BB46 /* Packages */,
+				E8904A76C10E2A384ABCF892 /* Resources */,
+				8FF027713D604195C2AA47C8 /* UITests */,
+				77384E3AD9CADBA84915F331 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		33398CCAD34830DD4401D99C /* OpenVisionMVP */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BE7306A0A0BF044A0785E637 /* Build configuration list for PBXNativeTarget "OpenVisionMVP" */;
+			buildPhases = (
+				2B2869AF13EF83A3021EDF99 /* Sources */,
+				27A42455E85DEF3660796046 /* Resources */,
+				2356B199BB9B2030348A1F42 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenVisionMVP;
+			packageProductDependencies = (
+				88966C0F474379C7F400BE96 /* OpenVisionCore */,
+				1FF8435369AE7F3174143341 /* SubscriptionCore */,
+				C821CD0020A5847A2777DC03 /* MWDATCore */,
+				29679E824E140F95B7C8AF4F /* MWDATCamera */,
+			);
+			productName = OpenVisionMVP;
+			productReference = 9006AFA19A1993A3227CF96D /* OpenVisionMVP.app */;
+			productType = "com.apple.product-type.application";
+		};
+		986B43ED1FB5839E1FA36ECE /* OpenVisionMVPUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 230F95EC1D84641331117BA6 /* Build configuration list for PBXNativeTarget "OpenVisionMVPUITests" */;
+			buildPhases = (
+				F63309B26776A0ADB8975777 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C6399DA994263A5EB936B1EB /* PBXTargetDependency */,
+			);
+			name = OpenVisionMVPUITests;
+			packageProductDependencies = (
+			);
+			productName = OpenVisionMVPUITests;
+			productReference = E9DD6BB35A33AA4F52EC7F7C /* OpenVisionMVPUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0046DF54E17E63C99DF0A0CE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					33398CCAD34830DD4401D99C = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					986B43ED1FB5839E1FA36ECE = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 33398CCAD34830DD4401D99C;
+					};
+				};
+			};
+			buildConfigurationList = BCF7E8F5B5E10E117F659DFD /* Build configuration list for PBXProject "OpenVisionMVP" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+				"zh-Hans",
+			);
+			mainGroup = F54D9D6BAF64CF230F5A0D63;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				ED058461A6421EAAF699699C /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */,
+				4B12E9BEB832976E4AF38305 /* XCLocalSwiftPackageReference "Core" */,
+				2744FB67AA640E4985815557 /* XCLocalSwiftPackageReference "Subscription" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 77384E3AD9CADBA84915F331 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				33398CCAD34830DD4401D99C /* OpenVisionMVP */,
+				986B43ED1FB5839E1FA36ECE /* OpenVisionMVPUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		27A42455E85DEF3660796046 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				25418324F370848C0455820D /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2B2869AF13EF83A3021EDF99 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6DBE984BB58E887DCEC805F1 /* ChatGPTAccountService.swift in Sources */,
+				0CE9FD075E3B0C546B0D25E5 /* ChatGPTPlanClient.swift in Sources */,
+				90991D22B1EED8F773ACEB5C /* ChatGPTSessionStore.swift in Sources */,
+				60BD1F21597574363B031D2D /* ContentView.swift in Sources */,
+				A3F4EB16B08EF16D55BB8287 /* ConversationViewModel.swift in Sources */,
+				AF54FFD30E12F6946805B85D /* GlassesPhotoService.swift in Sources */,
+				E79309BE642DD80E63934159 /* OpenVisionMVPApp.swift in Sources */,
+				188FF933030E40FA7C38D872 /* SpeechService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F63309B26776A0ADB8975777 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				96E989B69871659CA97AB519 /* MVPFlowTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C6399DA994263A5EB936B1EB /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 33398CCAD34830DD4401D99C /* OpenVisionMVP */;
+			targetProxy = E27BB6CE9083481EC87C9630 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		6C06A302932E411E594D3AD2 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				E7F935363771A343E3E36A08 /* en */,
+				B4555963A1FC7F3FFFD13FF6 /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		73738FD88C504A0AFF466495 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OpenVisionMVP;
+			};
+			name = Release;
+		};
+		8779E460C238E0294E67B93D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = OpenVisionMVP;
+			};
+			name = Debug;
+		};
+		98792B66C52517969E72CCE4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp;
+				PRODUCT_NAME = OpenVisionMVP;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		C9FEBD8F209BA614E13AB0BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CLIENT_TOKEN = "";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 0.1.0;
+				META_APP_ID = 0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		CBE2ED118A34199DDA08ADEF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CLIENT_TOKEN = "";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				MARKETING_VERSION = 0.1.0;
+				META_APP_ID = 0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		E674C2C63F3A7E302BA697FD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp;
+				PRODUCT_NAME = OpenVisionMVP;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		230F95EC1D84641331117BA6 /* Build configuration list for PBXNativeTarget "OpenVisionMVPUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8779E460C238E0294E67B93D /* Debug */,
+				73738FD88C504A0AFF466495 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BCF7E8F5B5E10E117F659DFD /* Build configuration list for PBXProject "OpenVisionMVP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C9FEBD8F209BA614E13AB0BF /* Debug */,
+				CBE2ED118A34199DDA08ADEF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BE7306A0A0BF044A0785E637 /* Build configuration list for PBXNativeTarget "OpenVisionMVP" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				98792B66C52517969E72CCE4 /* Debug */,
+				E674C2C63F3A7E302BA697FD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		2744FB67AA640E4985815557 /* XCLocalSwiftPackageReference "Subscription" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Subscription;
+		};
+		4B12E9BEB832976E4AF38305 /* XCLocalSwiftPackageReference "Core" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Core;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		ED058461A6421EAAF699699C /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios";
+			requirement = {
+				kind = exactVersion;
+				version = 1.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1FF8435369AE7F3174143341 /* SubscriptionCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SubscriptionCore;
+		};
+		29679E824E140F95B7C8AF4F /* MWDATCamera */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ED058461A6421EAAF699699C /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCamera;
+		};
+		88966C0F474379C7F400BE96 /* OpenVisionCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OpenVisionCore;
+		};
+		C821CD0020A5847A2777DC03 /* MWDATCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = ED058461A6421EAAF699699C /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0046DF54E17E63C99DF0A0CE /* Project object */;
+}
