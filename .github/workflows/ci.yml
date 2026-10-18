@@ -9,6 +9,8 @@ permissions:
 concurrency:
   group: mvp-${{ github.ref }}
   cancel-in-progress: true
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 jobs:
   verify:
     runs-on: macos-26
@@ -35,4 +37,5 @@ jobs:
         with:
           name: mvp-test-evidence
           path: .test-results/
-          if-no-files-found: ignore
+          include-hidden-files: true
+          if-no-files-found: error

@@ -1,6 +1,6 @@
-# MVP backlog / GitHub issue drafts
+# MVP backlog / GitHub issue index
 
-The fork's GitHub issues are the source of truth once these drafts are published. This file separates the user's core MVP from follow-up work; its presence does not mean an issue has already been created. Add actual issue links below when publishing. Do not expand the MVP by exposing unfinished upstream features in its main flow.
+The fork's linked GitHub issues are the source of truth. This file indexes the scoped MVP and ten published follow-up issues. Do not expand the MVP by exposing unfinished upstream features in its main flow.
 
 ## MVP tracking issue
 

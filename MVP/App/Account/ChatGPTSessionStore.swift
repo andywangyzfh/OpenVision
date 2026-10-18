@@ -2,33 +2,24 @@ import Foundation
 import Security
 import SubscriptionCore
 
-struct PlanCredentials: Codable, Sendable {
-    var clientID: String
-    var subject: String
-    var label: String
-    var accessToken: String
-    var refreshToken: String?
-    var idToken: String
-    var scopes: String
-    var expiresAt: Date
-}
-
 /// One app-owned account for the MVP; no access to Codex/ChatGPT caches or tokens.
 actor ChatGPTSessionStore {
     static let shared = ChatGPTSessionStore()
     private var credentials: PlanCredentials?
     private var refreshTask: Task<PlanCredentials, Error>?
+    private var refreshID: UUID?
     private var generation = 0
     private let key = "chatgpt-plan-session-v1"
     init() { credentials = try? KeychainRecord.read(PlanCredentials.self, key: "chatgpt-plan-session-v1") }
     func snapshot() -> PlanCredentials? { credentials }
     func save(_ value: PlanCredentials) throws {
         try KeychainRecord.write(value, key: key)
+        refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         generation += 1
         credentials = value
     }
     func accessToken(forceRefresh: Bool = false) async throws -> String {
-        guard let current = credentials else { throw PlanError.service("sign_in_required") }
+        guard let current = credentials else { throw PlanError.reauthenticationRequired }
         try SubscriptionContract.validateScopes(current.scopes)
         if !forceRefresh && current.expiresAt.timeIntervalSinceNow > 60 { return current.accessToken }
         if let task = refreshTask {
@@ -37,47 +28,39 @@ actor ChatGPTSessionStore {
             guard generation == expectedGeneration else { throw CancellationError() }
             return updated.accessToken
         }
-        guard let token = current.refreshToken else { throw PlanError.service("sign_in_required") }
-        let expectedGeneration = generation
-        let task = Task { () throws -> PlanCredentials in
-            let result = try await Self.tokenRequest(["grant_type": "refresh_token", "client_id": current.clientID,
-                "refresh_token": token, "resource": SubscriptionContract.resource])
-            var updated: PlanCredentials
-            if let idToken = result.id_token, !idToken.isEmpty {
-                updated = try await Self.validated(result, clientID: current.clientID, nonce: nil, previousScopes: current.scopes)
-            } else {
-                // OIDC refresh need not issue a new ID token. Keep the identity validated at
-                // initial sign-in; never accept an absent ID token during initial authorization.
-                let scopes = result.scope ?? current.scopes
-                try SubscriptionContract.validateScopes(scopes)
-                guard result.token_type.lowercased() == "bearer", !result.access_token.isEmpty,
-                      result.expires_in > 0 else { throw PlanError.invalidIdentity }
-                updated = current
-                updated.accessToken = result.access_token
-                updated.scopes = scopes
-                updated.expiresAt = Date().addingTimeInterval(result.expires_in)
-            }
-            updated.refreshToken = SubscriptionContract.refreshToken(replacement: updated.refreshToken, previous: current.refreshToken)
-            guard updated.subject == current.subject else { throw PlanError.invalidIdentity }
-            return updated
-        }
-        refreshTask = task
-        defer { refreshTask = nil }
-        let updated: PlanCredentials
-        do { updated = try await task.value }
-        catch PlanError.reauthenticationRequired {
-            if generation == expectedGeneration {
-                invalidate()
-            }
+        guard let token = current.refreshToken, !token.isEmpty else {
+            invalidate()
             throw PlanError.reauthenticationRequired
         }
+        let expectedGeneration = generation
+        let task = Task { () throws -> PlanCredentials in
+            do {
+                let result = try await Self.tokenRequest(["grant_type": "refresh_token", "client_id": current.clientID,
+                    "refresh_token": token, "resource": SubscriptionContract.resource])
+                let updated = try await Self.refreshed(current, reply: result)
+                guard generation == expectedGeneration else { throw CancellationError() }
+                // Every waiter awaits this same task, including durable persistence. A Keychain
+                // failure must never hand another caller an unpersisted rotating credential.
+                try KeychainRecord.write(updated, key: key)
+                credentials = updated
+                return updated
+            } catch PlanError.reauthenticationRequired {
+                if generation == expectedGeneration { invalidate() }
+                throw PlanError.reauthenticationRequired
+            }
+        }
+        let operationID = UUID()
+        refreshTask = task; refreshID = operationID
+        defer {
+            if refreshID == operationID { refreshTask = nil; refreshID = nil }
+        }
+        let updated = try await task.value
         guard generation == expectedGeneration else { throw CancellationError() }
-        try KeychainRecord.write(updated, key: key)
-        credentials = updated
         return updated.accessToken
     }
     func invalidate() {
         generation += 1
+        refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         credentials = nil
         KeychainRecord.delete(key: key)
         NotificationCenter.default.post(name: .chatGPTReauthenticationRequired, object: nil)
@@ -89,7 +72,7 @@ actor ChatGPTSessionStore {
     /// Stop requests first. A failed remote revoke still clears local credentials.
     func signOut() async -> Bool {
         generation += 1
-        refreshTask?.cancel(); refreshTask = nil
+        refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         let old = credentials
         credentials = nil
         KeychainRecord.delete(key: key)
@@ -115,6 +98,13 @@ actor ChatGPTSessionStore {
         guard (200...299).contains(status) else { throw SubscriptionContract.tokenError(status: status, data: data) }
         return try JSONDecoder().decode(TokenReply.self, from: data)
     }
+    static func refreshed(_ current: PlanCredentials, reply: TokenReply) async throws -> PlanCredentials {
+        let claims: [String: Any]?
+        if let idToken = reply.id_token {
+            claims = try await IDTokenVerifier.verify(idToken, clientID: current.clientID, nonce: nil)
+        } else { claims = nil }
+        return try current.refreshed(with: reply, signatureVerifiedClaims: claims)
+    }
     static func validated(_ reply: TokenReply, clientID: String, nonce: String?, previousScopes: String? = nil) async throws -> PlanCredentials {
         guard let scopes = reply.scope ?? previousScopes, let idToken = reply.id_token, !idToken.isEmpty else { throw PlanError.invalidIdentity }
         try SubscriptionContract.validateScopes(scopes)
@@ -136,15 +126,6 @@ actor ChatGPTSessionStore {
 
 extension Notification.Name {
     static let chatGPTReauthenticationRequired = Notification.Name("OpenVision.ChatGPTReauthenticationRequired")
-}
-
-struct TokenReply: Decodable {
-    let access_token: String
-    let refresh_token: String?
-    let id_token: String?
-    let token_type: String
-    let expires_in: Double
-    let scope: String?
 }
 
 enum KeychainRecord {

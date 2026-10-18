@@ -15,7 +15,7 @@ The model catalog intentionally follows the SIWC documentation's `models / slug 
 
 `swift run --package-path MVP/Subscription SubscriptionChecks`
 
-Runs 35 checks without network access or user tokens: new/returning registration, PKCE, state and client substitution, identity scopes, text/image request contract, SSE framing including UTF-8 and CRLF, incomplete replies and late usage failures, refresh token preservation, revoked-session classification, and actual RS256/ES256 signature verification with tampering checks. The RSA fixture contains only a public key and a signed synthetic token; its ephemeral private key was discarded.
+Runs 42 checks without network access or user tokens: new/returning registration, PKCE, state and client substitution, identity scopes, text/image request contract, SSE framing including UTF-8 and CRLF, incomplete replies and late usage failures, production refresh merging with omitted ID tokens and rotating refresh tokens, revoked-session classification, and actual RS256/ES256 signature verification with tampering checks. The RSA fixture contains only a public key and a signed synthetic token; its ephemeral private key was discarded.
 
 An XCTest target also provides conventional CI integration where XCTest is installed. On restricted command-line-only macOS installations, `swift run --disable-sandbox` may be needed to avoid SwiftPM's nested build sandbox; this does not disable the surrounding execution sandbox. Point Swift and Clang module caches to a writable temporary directory when required.
 

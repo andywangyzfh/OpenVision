@@ -18,11 +18,12 @@ actor ChatGPTPlanClient {
         request.httpBody = try SubscriptionContract.responseBody(model: model, instructions: instructions, turns: turns)
         request.timeoutInterval = 90
         // Never retry an inference automatically: a stream may already have consumed plan usage.
-        request.setValue("Bearer \(try await ChatGPTSessionStore.shared.accessToken())", forHTTPHeaderField: "Authorization")
+        let accessToken = try await ChatGPTSessionStore.shared.accessToken()
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw PlanError.service("network_error") }
         if http.statusCode == 401 {
-            await ChatGPTSessionStore.shared.invalidate()
+            await ChatGPTSessionStore.shared.discardIfMatching(accessToken)
             throw PlanError.reauthenticationRequired
         }
         guard http.statusCode == 200 else { throw PlanError.service("http_\(http.statusCode)") }
@@ -40,11 +41,12 @@ actor ChatGPTPlanClient {
     private func data(_ initial: URLRequest) async throws -> Data {
         var request = initial
         request.timeoutInterval = 30
-        request.setValue("Bearer \(try await ChatGPTSessionStore.shared.accessToken())", forHTTPHeaderField: "Authorization")
+        let accessToken = try await ChatGPTSessionStore.shared.accessToken()
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw PlanError.service("network_error") }
         if http.statusCode == 401 {
-            await ChatGPTSessionStore.shared.invalidate()
+            await ChatGPTSessionStore.shared.discardIfMatching(accessToken)
             throw PlanError.reauthenticationRequired
         }
         guard http.statusCode == 200 else { throw PlanError.service("http_\(http.statusCode)") }

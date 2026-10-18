@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import OpenVisionCore
 import SubscriptionCore
-import UIKit
 
 @MainActor
 final class ConversationViewModel: ObservableObject {
@@ -72,7 +71,7 @@ final class ConversationViewModel: ObservableObject {
         signingIn = true
         defer { signingIn = false }
         do { try await account.signIn() }
-        catch { status = text("登录未完成。可重试；没有使用付费 API。", "Sign-in did not finish. Retry when ready; no paid API was used.") }
+        catch { status = failureMessage(error) }
     }
 
     func refreshModels() async {
@@ -124,7 +123,12 @@ final class ConversationViewModel: ObservableObject {
             status = text("正在听，请说中文。", "Listening. Speak in English.")
         } catch {
             stop()
-            status = text("无法启用所选麦克风。请连接眼镜、断开其他蓝牙耳机，或选择 iPhone 麦克风。", "Selected microphone is unavailable. Connect glasses, disconnect other headsets, or select the iPhone microphone.")
+            if let speechError = error as? SpeechService.SpeechFailure,
+               speechError == .bluetoothMicrophoneMissing || speechError == .ambiguousBluetoothInput {
+                status = text("无法启用蓝牙麦克风。请连接眼镜、断开其他蓝牙耳机，或选择 iPhone 麦克风。", "Bluetooth microphone is unavailable. Connect glasses, disconnect other headsets, or select the iPhone microphone.")
+            } else {
+                status = text("无法启动此语言的语音识别。请检查语音识别权限、所选语言、网络和麦克风。", "Speech recognition could not start. Check speech permissions, the selected language, network and microphone.")
+            }
         }
     }
 
@@ -150,6 +154,7 @@ final class ConversationViewModel: ObservableObject {
             if !ready || modelID.isEmpty { showAccount = true }
             return
         }
+        startGeneration = UUID(); authorizingSpeech = false
         speech.stopAll()
         let id = lifecycle.begin(photo: photo)
         stage = lifecycle.phase; busy = true
@@ -198,8 +203,15 @@ final class ConversationViewModel: ObservableObject {
     }
 
     private func failureMessage(_ error: Error) -> String {
+        if let speechError = error as? SpeechService.SpeechFailure, speechError == .voiceMissing {
+            return text("没有可用的中文／英文播报声音。请在 iPhone 辅助功能的朗读内容设置中下载对应声音后重试。", "A matching speech voice is missing. Download the language voice in iPhone Accessibility speech settings, then retry.")
+        }
         if let planError = error as? PlanError {
             switch planError {
+            case .denied:
+                return text("ChatGPT 登录已取消或被拒绝。可在设置中重新登录。", "ChatGPT sign-in was cancelled or declined. Try again in Settings.")
+            case .missingPermission:
+                return text("没有获得使用订阅额度的授权。请检查账号资格，并在重新登录时允许订阅用量。", "Plan usage was not authorized. Check account eligibility and grant plan usage when signing in again.")
             case .reauthenticationRequired:
                 return text("订阅登录已失效，请在设置中重新登录 ChatGPT。", "Your plan sign-in expired or was revoked. Sign in again in Settings.")
             case .service(let code) where code == "http_429":

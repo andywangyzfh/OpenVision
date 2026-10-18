@@ -40,6 +40,21 @@ try check("refresh omission preserved", SubscriptionContract.refreshToken(replac
 try check("refresh rotation retained", SubscriptionContract.refreshToken(replacement: "new", previous: "old") == "new")
 try check("revoked session actionable", SubscriptionContract.tokenError(status: 400, data: try json(["error": "invalid_grant"])) == .reauthenticationRequired)
 
+let oldCredentials = PlanCredentials(clientID: "oaiapp_test", subject: "local-test-user", label: "Test",
+    accessToken: "old-access", refreshToken: "old-refresh", idToken: "previous-verified-id",
+    scopes: SubscriptionContract.scopes, expiresAt: Date(timeIntervalSince1970: 0))
+let refreshWithoutID = try JSONDecoder().decode(TokenReply.self, from: json(["access_token":"new-access", "refresh_token":"rotated-refresh", "token_type":"Bearer", "expires_in":3600]))
+let mergedWithoutID = try oldCredentials.refreshed(with: refreshWithoutID, signatureVerifiedClaims: nil, now: Date(timeIntervalSince1970: 100))
+try check("real refresh merge rotates token without ID token", mergedWithoutID.refreshToken == "rotated-refresh" && mergedWithoutID.accessToken == "new-access")
+try check("refresh preserves verified identity and prior scopes", mergedWithoutID.idToken == oldCredentials.idToken && mergedWithoutID.subject == oldCredentials.subject && mergedWithoutID.scopes == oldCredentials.scopes)
+try check("refresh updates expiry", mergedWithoutID.expiresAt == Date(timeIntervalSince1970: 3700))
+let refreshWithoutReplacement = try JSONDecoder().decode(TokenReply.self, from: json(["access_token":"new-access", "token_type":"Bearer", "expires_in":3600]))
+try check("real refresh merge retains omitted replacement", try oldCredentials.refreshed(with: refreshWithoutReplacement, signatureVerifiedClaims: nil).refreshToken == "old-refresh")
+let refreshWithID = try JSONDecoder().decode(TokenReply.self, from: json(["access_token":"new-access", "refresh_token":"rotated-again", "id_token":"new-id", "token_type":"Bearer", "expires_in":3600]))
+rejects("new refresh identity requires verified claims") { _ = try oldCredentials.refreshed(with: refreshWithID, signatureVerifiedClaims: nil) }
+rejects("refresh cannot switch identity") { _ = try oldCredentials.refreshed(with: refreshWithID, signatureVerifiedClaims: ["sub":"different-user"]) }
+try check("verified refresh rotates all credentials", try oldCredentials.refreshed(with: refreshWithID, signatureVerifiedClaims: ["sub":"local-test-user"]).refreshToken == "rotated-again")
+
 let payload = try SubscriptionContract.responseBody(model: "account-model", instructions: "用中文回答", turns: [PlanTurn(role: "user", text: "看看这个", imageJPEG: Data([1, 2, 3])), PlanTurn(role: "assistant", text: "好的")])
 let body = try JSONSerialization.jsonObject(with: payload) as! [String: Any]
 try check("supported fields only", Set(body.keys) == Set(["model", "instructions", "input", "store", "stream"]))
