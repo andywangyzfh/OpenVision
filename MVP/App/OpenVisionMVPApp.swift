@@ -8,14 +8,20 @@ struct OpenVisionMVPApp: App {
 
     init() {
         #if DEBUG
-        let preview = ProcessInfo.processInfo.arguments.contains("--mvp-ui-testing")
-        if preview { UserDefaults.standard.set("zh-CN", forKey: "mvp.language") }
+        let arguments = ProcessInfo.processInfo.arguments
+        let preview = arguments.contains("--mvp-ui-testing")
+        let smoke = arguments.contains("--mvp-smoke-testing")
+        if preview, arguments.contains("--reset-mvp-language") { UserDefaults.standard.set("zh-CN", forKey: "mvp.language") }
+        if preview, let index = arguments.firstIndex(of: "--mvp-test-language"), arguments.indices.contains(index + 1) {
+            UserDefaults.standard.set(arguments[index + 1], forKey: "mvp.language")
+        }
         #else
         let preview = false
+        let smoke = false
         #endif
         var setupFailed = false
         if !preview { do { try Wearables.configure() } catch { setupFailed = true } }
-        let account = ChatGPTAccountService()
+        let account = ChatGPTAccountService(restoreSession: !preview && !smoke)
         let model = ConversationViewModel(account: account, preview: preview)
         if setupFailed { model.status = "Meta SDK setup failed / Meta SDK 初始化失败" }
         _account = StateObject(wrappedValue: account)

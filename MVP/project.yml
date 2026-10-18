@@ -44,6 +44,30 @@ targets:
         product: MWDATCore
       - package: MetaDAT
         product: MWDATCamera
+  OpenVisionMVPPlatformTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PlatformTests
+      # Compile the exact production control/storage sources in an isolated test bundle.
+      # No application host is launched, so tests cannot restore a user's account.
+      - path: App/GlassesPhotoService.swift
+      - path: App/DATCameraDriver.swift
+      - path: App/SpeechService.swift
+      - path: App/SpeechDriver.swift
+      - path: App/Account/ChatGPTSessionStore.swift
+      - path: App/Account/PlanCredentialStorage.swift
+    dependencies:
+      - package: OpenVisionCore
+      - package: SubscriptionCore
+      - package: MetaDAT
+        product: MWDATCore
+      - package: MetaDAT
+        product: MWDATCamera
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp.platformtests
   OpenVisionMVPUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -61,5 +85,5 @@ schemes:
       targets:
         OpenVisionMVP: all
     test:
-      targets: [OpenVisionMVPUITests]
+      targets: [OpenVisionMVPPlatformTests, OpenVisionMVPUITests]
       gatherCoverageData: true

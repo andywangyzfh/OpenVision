@@ -27,7 +27,7 @@ swift test --package-path MVP/Subscription
 bash MVP/scripts/check-ios.sh
 ```
 
-`check-local.sh` 执行 120 项核心行为断言、42 项认证/流处理断言、17 个实际对话 ViewModel 的异步场景，以及 Swift 语法解析、plist 校验及工程生成。ViewModel 测试使用实际生产代码，硬件/账号/模型传输为离线替身。**它不是 iOS 编译或完整验收通过。** `check-ios.sh` 选择已安装的 iPhone 模拟器并执行实际 App 构建/UI fixture 测试；测试结果写到忽略提交的 `.test-results/`。UI fixture 明确无网络、无麦克风，也不会伪造成功的硬件拍照。其通过不能替代眼镜/真实账号测试。
+`check-local.sh` 执行 120 项核心行为断言、42 项认证/流处理断言、51 个实际对话 ViewModel 的异步场景、28 个 HTTP 异常场景、13 个账号存储场景及 61 项本地回调断言，以及 Swift 语法解析、plist 校验及工程生成。ViewModel 测试使用实际生产代码，硬件/账号/模型传输为离线替身。回调测试仅连接本机 127.0.0.1，使用合成授权码。**它不是 iOS 编译或完整验收通过。** `check-ios.sh` 自动寻找完整 Xcode、检查首次初始化，选择已安装的 iPhone 模拟器并执行实际 App 构建、生产控制层测试与 UI 测试；测试结果写到忽略提交的 `.test-results/`。UI fixture 明确无网络、无麦克风，也不会伪造成功的硬件拍照。其通过不能替代眼镜/真实账号测试。
 
 完整验收按 [两个 gate](docs/acceptance-mvp.md) 执行。GitHub CI 提供独立构建反馈，不能代替用户要求的本地测试。未通过本地 gate 前不进行 iPhone 安装。
 

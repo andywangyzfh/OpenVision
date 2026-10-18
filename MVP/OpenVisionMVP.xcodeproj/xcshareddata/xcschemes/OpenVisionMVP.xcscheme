@@ -45,6 +45,17 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "280056A220290CB8CFE2C5DF"
+               BuildableName = "OpenVisionMVPPlatformTests.xctest"
+               BlueprintName = "OpenVisionMVPPlatformTests"
+               ReferencedContainer = "container:OpenVisionMVP.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "986B43ED1FB5839E1FA36ECE"
                BuildableName = "OpenVisionMVPUITests.xctest"
                BlueprintName = "OpenVisionMVPUITests"

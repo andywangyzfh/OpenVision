@@ -55,6 +55,193 @@ private func finishTurn(_ model: ConversationViewModel) async throws {
     try await eventually("turn complete") { !model.busy }
 }
 
+@MainActor
+private func additionalScenarios() -> [(String, @MainActor () async throws -> Void)] {
+    var scenarios: [(String, @MainActor () async throws -> Void)] = [
+        ("short Mandarin speech turns reach the model unchanged", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            await vm.toggleConversation()
+            for (index, utterance) in ["好", "是", "继续"].enumerated() {
+                vm.speech.emitUtterance(utterance)
+                try await finishTurn(vm)
+                try expect(world.requests.count == index + 1, "Short Mandarin was dropped or duplicated")
+                try expect(world.requests.last?.turns.last?.text == utterance, "Short Mandarin changed")
+                try expect(vm.glasses.captures == 0 && vm.speech.isListening, "Short text opened camera or lost listening")
+            }
+        }),
+        ("empty and punctuation-only speech makes no model or camera request", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            await vm.toggleConversation()
+            for utterance in ["", "  \n ", "。！？", "..."] { vm.speech.emitUtterance(utterance) }
+            await drain()
+            try expect(world.requests.isEmpty && vm.glasses.captures == 0 && vm.messages.isEmpty, "Empty utterance reached a service")
+            try expect(!vm.busy && vm.conversationActive && vm.speech.isListening, "Empty utterance wedged conversation")
+        }),
+        ("cancelled old reply cannot mutate a newer active turn", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            world.holdResponses = true
+            send(vm, "旧轮问题")
+            try await eventually("old request suspended") { world.pendingResponses.count == 1 }
+            vm.stop()
+            send(vm, "新轮问题")
+            try await eventually("new request suspended") { world.pendingResponses.count == 2 }
+            world.resolveResponse(at: 0, answer: "迟到旧回答")
+            await drain()
+            try expect(vm.busy && vm.stage == .answering && vm.messages.count == 2, "Old completion reset or mutated newer turn")
+            try expect(vm.speech.spoken.isEmpty && world.pendingResponses.count == 1, "Old completion escaped into audio")
+            world.resolveResponse(at: 0, answer: "新轮回答")
+            try await finishTurn(vm)
+            try expect(vm.speech.spoken.count == 1 && vm.speech.spoken.last?.text == "新轮回答", "New turn did not complete independently")
+            world.holdResponses = false
+            send(vm, "后续问题"); try await finishTurn(vm)
+            try expect(world.requests.last?.turns.contains(where: { $0.text == "迟到旧回答" || $0.text == "旧轮问题" }) == false, "Cancelled turn entered model history")
+        }),
+        ("signed-out submission stays idle then explicit sign-in and retry succeeds", {
+            let (vm, world) = try await setup(signedIn: false); defer { vm.stop() }
+            send(vm, "请回答这个问题")
+            await drain()
+            try expect(vm.showAccount && !vm.busy && world.requests.isEmpty && vm.glasses.captures == 0, "Signed-out request reached services")
+            await vm.connectAccount()
+            try await eventually("signed-in model ready") { vm.canSend }
+            try expect(world.requests.isEmpty, "Signing in automatically retried inference")
+            send(vm, "请回答这个问题"); try await finishTurn(vm)
+            try expect(world.requests.count == 1 && vm.account.signInCalls == 1, "Explicit retry after sign-in failed")
+        }),
+        ("declined sign-in stays idle and explicit sign-in retry succeeds", {
+            let (vm, world) = try await setup(signedIn: false); defer { vm.stop() }
+            vm.account.signInError = .denied
+            await vm.connectAccount(); await drain()
+            try expect(!vm.signingIn && !vm.busy && !vm.ready && vm.models.isEmpty, "Declined sign-in left a busy or authenticated state")
+            try expect(vm.status.contains("取消或被拒绝") && world.requests.isEmpty && vm.account.signInCalls == 1, "Sign-in error missing or retried")
+            vm.account.signInError = nil
+            await vm.connectAccount()
+            try await eventually("retry sign-in ready") { vm.canSend }
+            send(vm, "重新登录后回答"); try await finishTurn(vm)
+            try expect(vm.account.signInCalls == 2 && world.requests.count == 1, "Explicit sign-in recovery failed")
+        }),
+        ("empty model catalog blocks requests and explicit catalog refresh recovers", {
+            let (vm, world) = try await setup(signedIn: false); defer { vm.stop() }
+            world.catalog = []
+            vm.account.restoreSignedIn()
+            try await eventually("empty catalog result") { world.modelLoads == 1 && vm.status.contains("没有返回可用模型") }
+            send(vm, "没有模型时不能调用")
+            await drain()
+            try expect(!vm.busy && !vm.canSend && vm.models.isEmpty && world.requests.isEmpty, "Empty catalog allowed inference")
+            try expect(world.modelLoads == 1, "Empty catalog automatically reloaded")
+            world.catalog = [PlanModel(id: "recovered-model", name: "Recovered fixture")]
+            await vm.refreshModels()
+            send(vm, "模型恢复后回答"); try await finishTurn(vm)
+            try expect(world.requests.count == 1 && world.requests.last?.model == "recovered-model", "Explicit catalog recovery failed")
+        }),
+        ("recognizer startup error returns idle and explicit restart recovers", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.speech.listenError = .unavailable
+            await vm.toggleConversation()
+            try expect(!vm.busy && !vm.conversationActive && !vm.speech.isListening && !vm.authorizingSpeech, "Recognizer failure left conversation busy")
+            try expect(vm.status.contains("无法启动此语言") && world.requests.isEmpty && vm.speech.listenAttempts == 1, "Recognizer error missing or retried")
+            vm.speech.listenError = nil
+            await vm.toggleConversation()
+            vm.speech.emitUtterance("恢复识别后回答"); try await finishTurn(vm)
+            try expect(world.requests.count == 1 && vm.speech.isListening, "Explicit recognizer restart failed")
+        }),
+        ("recognition failure callback stops session and explicit restart recovers", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            await vm.toggleConversation()
+            vm.speech.emitFailure(); await drain()
+            try expect(!vm.busy && !vm.conversationActive && !vm.speech.isListening, "ASR error callback did not stop conversation")
+            try expect(vm.status.contains("收音已停止") && world.requests.isEmpty && vm.speech.listenAttempts == 1, "ASR error guidance or no-retry broken")
+            await vm.toggleConversation()
+            vm.speech.emitUtterance("再次开始识别"); try await finishTurn(vm)
+            try expect(world.requests.count == 1 && vm.speech.isListening, "Explicit ASR recovery failed")
+        }),
+        ("missing TTS voice exits busy and explicit retry succeeds", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.speech.speakError = .voiceMissing
+            send(vm, "请测试中文声音")
+            try await eventually("missing voice settles") { world.requests.count == 1 && !vm.busy }
+            await drain()
+            try expect(vm.stage == .idle && !vm.conversationActive && vm.speech.spoken.isEmpty, "Missing voice left busy or spoke")
+            try expect(vm.status.contains("播报声音") && vm.speech.speakAttempts == 1 && world.requests.count == 1, "Missing voice guidance or no-retry broken")
+            vm.speech.speakError = nil
+            send(vm, "下载声音后重试"); try await finishTurn(vm)
+            try expect(world.requests.count == 2 && vm.speech.spoken.count == 1, "Explicit voice retry failed")
+        })
+    ]
+    let photoCommands: [(String, ConversationLanguage)] = [
+        ("看看这个", .chinese), ("拍照看看", .chinese), ("拍张照片告诉我这是什么", .chinese),
+        ("Take a photo and tell me what this is", .english), ("What do you see?", .english)
+    ]
+    for (utterance, language) in photoCommands {
+        scenarios.append(("LANG-04 explicit speech photo: " + utterance, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.language = language
+            let fresh = Data(("fresh-" + utterance).utf8)
+            vm.glasses.photos = [fresh]
+            await vm.toggleConversation()
+            vm.speech.emitUtterance(utterance)
+            try await finishTurn(vm)
+            try expect(vm.glasses.captures == 1 && world.requests.count == 1, "Explicit voice photo did not capture/send once")
+            try expect(world.requests[0].turns.compactMap(\.imageJPEG) == [fresh], "Explicit voice photo did not carry current photo")
+            try expect(vm.speech.spoken.count == 1 && vm.speech.isListening, "Photo answer did not resume conversation")
+        }))
+    }
+    for utterance in ["我今天想聊摄影", "Let's talk about photography", "我昨天拍照了", "开始连续视频", "开始实时视频", "Start continuous video", "start a live video stream", "拍照并持续录像"] {
+        scenarios.append(("no camera for discussion or continuous-video speech: " + utterance, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            await vm.toggleConversation()
+            vm.speech.emitUtterance(utterance)
+            try await finishTurn(vm)
+            try expect(vm.glasses.captures == 0 && !vm.glasses.cameraActive, "Non-photo utterance opened camera")
+            try expect(world.requests.count == 1 && world.requests[0].turns.allSatisfy { $0.imageJPEG == nil }, "Non-photo turn carried visual data")
+        }))
+    }
+    let modelFailures: [(String, any Error, String)] = [
+        ("expired subscription", PlanError.reauthenticationRequired, "登录已失效"),
+        ("revoked subscription", PlanError.reauthenticationRequired, "登录已失效"),
+        ("403 permission", PlanError.service("http_403"), "没有此请求的权限"),
+        ("500 server", PlanError.service("http_500"), "本轮未完成"),
+        ("503 server", PlanError.service("http_503"), "本轮未完成"),
+        ("offline network", URLError(.notConnectedToInternet), "本轮未完成"),
+        ("network timeout", URLError(.timedOut), "本轮未完成"),
+        ("empty model response", PlanError.service("empty_reply"), "本轮未完成")
+    ]
+    for (name, failure, guidance) in modelFailures {
+        scenarios.append(("model failure leaves idle without retry, explicit retry succeeds: " + name, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            world.responseError = failure
+            send(vm, "请测试这一轮错误")
+            try await eventually("failed turn settled") { world.requests.count == 1 && !vm.busy }
+            await drain()
+            try expect(vm.stage == .idle && !vm.conversationActive && vm.speech.spoken.isEmpty, "Failure left busy, listening or speaking")
+            try expect(vm.status.contains(guidance) && vm.messages.allSatisfy(\.user), "Failure guidance missing or answer invented")
+            try expect(world.requests.count == 1 && vm.glasses.captures == 0, "Failure automatically retried or captured")
+            world.responseError = nil
+            if (failure as? PlanError) == .reauthenticationRequired {
+                // Recovery from a revoked/expired account is an explicit fresh sign-in, not
+                // an implicit assumption that the same expired token became valid again.
+                await vm.signOut(); await drain()
+                await vm.connectAccount()
+                try await eventually("explicit reauthentication ready") { vm.canSend }
+                try expect(vm.account.signInCalls == 1 && world.requests.count == 1, "Reauthentication automatically retried inference")
+            }
+            send(vm, "现在手动重试"); try await finishTurn(vm)
+            try expect(world.requests.count == 2 && vm.speech.spoken.count == 1, "Explicit retry after error failed")
+        }))
+    }
+    for stop in ["停止", "取消", "Stop", "Cancel"] {
+        scenarios.append(("explicit control cancels pending turn: " + stop, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            world.holdResponses = true; send(vm, "等待中问题")
+            try await eventually("request held") { world.pendingResponses.count == 1 }
+            vm.submit(stop)
+            world.resolveResponses(); await drain()
+            try expect(!vm.busy && vm.stage == .idle && vm.speech.spoken.isEmpty, "Stop/Cancel failed to invalidate held answer")
+            try expect(world.requests.count == 1 && vm.glasses.captures == 0, "Stop/Cancel created a request")
+        }))
+    }
+    return scenarios
+}
+
 @main
 struct FlowChecks {
     @MainActor
@@ -189,7 +376,7 @@ struct FlowChecks {
             }),
             ("model quota error produces no invented answer or retry", {
                 let (vm, world) = try await setup(); defer { vm.stop() }
-                world.responseError = .service("http_429"); send(vm, "请回答这个问题")
+                world.responseError = PlanError.service("http_429"); send(vm, "请回答这个问题")
                 try await eventually("model error settled") { !vm.busy }
                 try expect(world.requests.count == 1 && vm.speech.spoken.isEmpty && vm.messages.allSatisfy(\.user), "Model error retried or produced output")
                 try expect(vm.status.contains("没有转用付费 API"), "Quota recovery message missing")
@@ -221,12 +408,13 @@ struct FlowChecks {
             })
         ]
         do {
-            for (name, scenario) in scenarios {
+            let allScenarios = scenarios + additionalScenarios()
+            for (name, scenario) in allScenarios {
                 try await scenario()
                 await drain()
                 print("PASS: " + name)
             }
-            print("PASS: \(scenarios.count) production ConversationViewModel flow scenarios. Platform, account and model services are fakes; this does not validate iPhone or glasses hardware.")
+            print("PASS: \(allScenarios.count) production ConversationViewModel flow scenarios. Platform, account and model services are fakes; this does not validate iPhone or glasses hardware.")
         } catch {
             FileHandle.standardError.write(Data("FAIL: production VM flow acceptance: \(error)\n".utf8))
             restoreDefaults() // exit() does not unwind defer blocks.

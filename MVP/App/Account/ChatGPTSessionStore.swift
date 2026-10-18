@@ -1,5 +1,4 @@
 import Foundation
-import Security
 import SubscriptionCore
 
 /// One app-owned account for the MVP; no access to Codex/ChatGPT caches or tokens.
@@ -9,22 +8,33 @@ actor ChatGPTSessionStore {
     private var refreshTask: Task<PlanCredentials, Error>?
     private var refreshID: UUID?
     private var generation = 0
-    private let key = "chatgpt-plan-session-v1"
-    init() { credentials = try? KeychainRecord.read(PlanCredentials.self, key: "chatgpt-plan-session-v1") }
+    typealias RefreshOperation = @Sendable (PlanCredentials) async throws -> PlanCredentials
+    typealias RevocationOperation = @Sendable (PlanCredentials) async -> Bool
+    private let storage: any PlanCredentialStorage
+    private let refreshOperation: RefreshOperation
+    private let revocationOperation: RevocationOperation
+    init(storage: any PlanCredentialStorage = KeychainPlanCredentialStorage(),
+         refreshOperation: @escaping RefreshOperation = { try await ChatGPTSessionStore.refreshSession($0) },
+         revocationOperation: @escaping RevocationOperation = { await ChatGPTSessionStore.revokeSession($0) }) {
+        self.storage = storage; self.refreshOperation = refreshOperation; self.revocationOperation = revocationOperation
+        credentials = try? storage.load()
+    }
     func snapshot() -> PlanCredentials? { credentials }
     func save(_ value: PlanCredentials) throws {
-        try KeychainRecord.write(value, key: key)
+        try storage.save(value)
         refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         generation += 1
         credentials = value
     }
     func accessToken(forceRefresh: Bool = false) async throws -> String {
+        try Task.checkCancellation()
         guard let current = credentials else { throw PlanError.reauthenticationRequired }
         try SubscriptionContract.validateScopes(current.scopes)
         if !forceRefresh && current.expiresAt.timeIntervalSinceNow > 60 { return current.accessToken }
         if let task = refreshTask {
             let expectedGeneration = generation
             let updated = try await task.value
+            try Task.checkCancellation()
             guard generation == expectedGeneration else { throw CancellationError() }
             return updated.accessToken
         }
@@ -35,13 +45,13 @@ actor ChatGPTSessionStore {
         let expectedGeneration = generation
         let task = Task { () throws -> PlanCredentials in
             do {
-                let result = try await Self.tokenRequest(["grant_type": "refresh_token", "client_id": current.clientID,
-                    "refresh_token": token, "resource": SubscriptionContract.resource])
-                let updated = try await Self.refreshed(current, reply: result)
+                let updated = try await refreshOperation(current)
                 guard generation == expectedGeneration else { throw CancellationError() }
+                guard updated.clientID == current.clientID, updated.subject == current.subject else { throw PlanError.invalidIdentity }
+                try SubscriptionContract.validateScopes(updated.scopes)
                 // Every waiter awaits this same task, including durable persistence. A Keychain
                 // failure must never hand another caller an unpersisted rotating credential.
-                try KeychainRecord.write(updated, key: key)
+                try storage.save(updated)
                 credentials = updated
                 return updated
             } catch PlanError.reauthenticationRequired {
@@ -55,6 +65,7 @@ actor ChatGPTSessionStore {
             if refreshID == operationID { refreshTask = nil; refreshID = nil }
         }
         let updated = try await task.value
+        try Task.checkCancellation()
         guard generation == expectedGeneration else { throw CancellationError() }
         return updated.accessToken
     }
@@ -62,7 +73,7 @@ actor ChatGPTSessionStore {
         generation += 1
         refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         credentials = nil
-        KeychainRecord.delete(key: key)
+        storage.clear()
         NotificationCenter.default.post(name: .chatGPTReauthenticationRequired, object: nil)
     }
     func discardIfMatching(_ token: String) {
@@ -75,8 +86,18 @@ actor ChatGPTSessionStore {
         refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         let old = credentials
         credentials = nil
-        KeychainRecord.delete(key: key)
-        guard let old, let refreshToken = old.refreshToken else { return true }
+        storage.clear()
+        guard let old else { return true }
+        return await revocationOperation(old)
+    }
+    static func refreshSession(_ current: PlanCredentials) async throws -> PlanCredentials {
+        guard let token = current.refreshToken, !token.isEmpty else { throw PlanError.reauthenticationRequired }
+        let result = try await tokenRequest(["grant_type": "refresh_token", "client_id": current.clientID,
+            "refresh_token": token, "resource": SubscriptionContract.resource])
+        return try await refreshed(current, reply: result)
+    }
+    static func revokeSession(_ old: PlanCredentials) async -> Bool {
+        guard let refreshToken = old.refreshToken else { return true }
         do {
             guard let endpoint = try await IDTokenVerifier.discovery().revocation_endpoint else { return false }
             var request = URLRequest(url: endpoint)
@@ -126,34 +147,4 @@ actor ChatGPTSessionStore {
 
 extension Notification.Name {
     static let chatGPTReauthenticationRequired = Notification.Name("OpenVision.ChatGPTReauthenticationRequired")
-}
-
-enum KeychainRecord {
-    private static let service = "org.openvision.bilingual-mvp"
-    private static func query(_ key: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: key]
-    }
-    static func read<T: Decodable>(_ type: T.Type, key: String) throws -> T? {
-        var request = query(key)
-        request[kSecReturnData as String] = true
-        request[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(request as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data else { throw PlanError.service("keychain_read_failed") }
-        return try JSONDecoder().decode(type, from: data)
-    }
-    static func write<T: Encodable>(_ value: T, key: String) throws {
-        let data = try JSONEncoder().encode(value)
-        let base = query(key)
-        let update = [kSecValueData as String: data]
-        let status = SecItemUpdate(base as CFDictionary, update as CFDictionary)
-        if status == errSecItemNotFound {
-            var insert = base
-            insert[kSecValueData as String] = data
-            insert[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            guard SecItemAdd(insert as CFDictionary, nil) == errSecSuccess else { throw PlanError.service("keychain_write_failed") }
-        } else if status != errSecSuccess { throw PlanError.service("keychain_write_failed") }
-    }
-    static func delete(key: String) { SecItemDelete(query(key) as CFDictionary) }
 }

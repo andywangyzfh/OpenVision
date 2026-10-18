@@ -17,7 +17,7 @@ final class FlowWorld {
     var modelLoads = 0
     var requests: [Request] = []
     var holdResponses = false
-    var responseError: PlanError?
+    var responseError: (any Error)?
     var answer = "你好，这是离线回答。"
     var pendingResponses: [CheckedContinuation<String, Error>] = []
     var completedResponses = 0
@@ -27,13 +27,20 @@ final class FlowWorld {
         pendingResponses.removeAll()
         pending.forEach { $0.resume(returning: answer) }
     }
+
+    func resolveResponse(at index: Int, answer: String) {
+        pendingResponses.remove(at: index).resume(returning: answer)
+    }
 }
 
 @MainActor
 final class ChatGPTPlanClient {
     private let world: FlowWorld
     init(account: ChatGPTAccountService) { world = .current }
-    func models() async throws -> [PlanModel] { world.modelLoads += 1; return world.catalog }
+    func models() async throws -> [PlanModel] {
+        world.modelLoads += 1
+        return world.catalog
+    }
     func respond(model: String, instructions: String, turns: [PlanTurn]) async throws -> String {
         world.requests.append(.init(model: model, instructions: instructions, turns: turns))
         if let error = world.responseError { throw error }
@@ -51,8 +58,14 @@ final class ChatGPTAccountService: ObservableObject {
     @Published private(set) var isSignedIn = false
     var signOutNotice: String?
     var cancelledSignIns = 0
+    var signInCalls = 0
+    var signInError: PlanError?
     func restoreSignedIn() { isSignedIn = true }
-    func signIn() async throws { isSignedIn = true }
+    func signIn() async throws {
+        signInCalls += 1
+        if let error = signInError { throw error }
+        isSignedIn = true
+    }
     func signOut() async { isSignedIn = false }
     func cancelSignIn() { cancelledSignIns += 1 }
 }
@@ -73,6 +86,10 @@ final class SpeechService: ObservableObject {
     var spoken: [Spoken] = []
     var isListening = false
     var stopCalls = 0
+    var listenError: SpeechFailure?
+    var speakError: SpeechFailure?
+    var listenAttempts = 0
+    var speakAttempts = 0
     func authorize() async -> Bool {
         authorizationRequests += 1
         if holdAuthorization { return await withCheckedContinuation { pendingAuthorization = $0 } }
@@ -83,13 +100,18 @@ final class SpeechService: ObservableObject {
         pending?.resume(returning: allowed)
     }
     func listen(language: ConversationLanguage, glassesMicrophone: Bool) throws {
+        listenAttempts += 1
+        if let error = listenError { throw error }
         listening.append(.init(language: language, glassesMicrophone: glassesMicrophone)); isListening = true
     }
     func speak(_ text: String, language: ConversationLanguage) throws {
+        speakAttempts += 1
+        if let error = speakError { throw error }
         spoken.append(.init(text: text, language: language)); isListening = false
     }
     func finishPlayback() { onSpeechFinished?() }
     func emitUtterance(_ value: String) { isListening = false; onUtterance?(value) }
+    func emitFailure() { isListening = false; onFailure?() }
     func stopAll() { stopCalls += 1; isListening = false }
 }
 

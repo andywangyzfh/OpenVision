@@ -67,6 +67,9 @@ struct MVPContentView: View {
                     ToolbarItem(placement: .topBarTrailing) { Button { model.showAccount = true } label: { Image(systemName: "gearshape") }.accessibilityIdentifier("settings.open") }
                 }
                 .sheet(isPresented: $model.showAccount) { settings }
+                .onChange(of: model.showAccount) { _, presented in
+                    if presented { model.stop() }
+                }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .background { model.setForeground(false) }
                     else if phase == .active { model.setForeground(true) }

@@ -2,7 +2,25 @@ import Foundation
 import SubscriptionCore
 
 actor ChatGPTPlanClient {
-    init(account: ChatGPTAccountService) { /* Account owns UI; Keychain-backed actor owns credentials. */ }
+    typealias TokenSupplier = @Sendable () async throws -> String
+    typealias TokenInvalidator = @Sendable (String) async -> Void
+    private let session: URLSession
+    private let tokenSupplier: TokenSupplier
+    private let invalidateToken: TokenInvalidator
+
+    init(account: ChatGPTAccountService) {
+        session = .shared
+        tokenSupplier = { try await ChatGPTSessionStore.shared.accessToken() }
+        invalidateToken = { await ChatGPTSessionStore.shared.discardIfMatching($0) }
+    }
+
+    /// Inject an isolated transport and app-owned token operations for offline integration tests.
+    /// The production initializer above retains the shared URLSession/Keychain-backed behavior.
+    init(session: URLSession, tokenSupplier: @escaping TokenSupplier, invalidateToken: @escaping TokenInvalidator) {
+        self.session = session
+        self.tokenSupplier = tokenSupplier
+        self.invalidateToken = invalidateToken
+    }
 
     func models() async throws -> [PlanModel] {
         let request = URLRequest(url: URL(string: SubscriptionContract.resource + "/models")!)
@@ -18,12 +36,12 @@ actor ChatGPTPlanClient {
         request.httpBody = try SubscriptionContract.responseBody(model: model, instructions: instructions, turns: turns)
         request.timeoutInterval = 90
         // Never retry an inference automatically: a stream may already have consumed plan usage.
-        let accessToken = try await ChatGPTSessionStore.shared.accessToken()
+        let accessToken = try await tokenSupplier()
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse else { throw PlanError.service("network_error") }
         if http.statusCode == 401 {
-            await ChatGPTSessionStore.shared.discardIfMatching(accessToken)
+            await invalidateToken(accessToken)
             throw PlanError.reauthenticationRequired
         }
         guard http.statusCode == 200 else { throw PlanError.service("http_\(http.statusCode)") }
@@ -41,12 +59,12 @@ actor ChatGPTPlanClient {
     private func data(_ initial: URLRequest) async throws -> Data {
         var request = initial
         request.timeoutInterval = 30
-        let accessToken = try await ChatGPTSessionStore.shared.accessToken()
+        let accessToken = try await tokenSupplier()
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw PlanError.service("network_error") }
         if http.statusCode == 401 {
-            await ChatGPTSessionStore.shared.discardIfMatching(accessToken)
+            await invalidateToken(accessToken)
             throw PlanError.reauthenticationRequired
         }
         guard http.statusCode == 200 else { throw PlanError.service("http_\(http.statusCode)") }

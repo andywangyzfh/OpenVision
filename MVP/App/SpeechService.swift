@@ -1,133 +1,78 @@
-import AVFoundation
 import Combine
+import Foundation
 import OpenVisionCore
-import Speech
 
-/// Foreground conversation only. Recognition is stopped before TTS and before DAT starts.
+/// Foreground turn controller. Default effects use real Apple APIs; tests inject only a driver.
 @MainActor
-final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
+final class SpeechService: ObservableObject {
     @Published private(set) var transcript = ""
     @Published private(set) var inputName = ""
     @Published private(set) var isListening = false
     var onUtterance: ((String) -> Void)?
     var onSpeechFinished: (() -> Void)?
     var onFailure: (() -> Void)?
-    private let engine = AVAudioEngine()
-    private let synthesizer = AVSpeechSynthesizer()
-    private var recognizer: SFSpeechRecognizer?
-    private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
+    private let driver: any SpeechDriver
+    private let silenceSleep: @Sendable () async throws -> Void
     private var silenceTask: Task<Void, Never>?
     private var listenID = UUID()
-    private var tapInstalled = false
     private var committed = false
-    private var activeUtteranceID: ObjectIdentifier?
-    private var selectedInputUID: String?
-    private var routeObserver: NSObjectProtocol?
-    private var interruptionObserver: NSObjectProtocol?
+    private var activeUtteranceID: UUID?
 
-    override init() {
-        super.init()
-        synthesizer.delegate = self
-        routeObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.verifyInputRoute() }
-        }
-        interruptionObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
-        ) { [weak self] notification in
-            let began = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
-                == AVAudioSession.InterruptionType.began.rawValue
-            guard began else { return }
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.stopAll()
-                // Also cancel a pending model turn via the owner's failure callback. Resuming
-                // after a phone call requires the user's explicit Start action.
-                self.onFailure?()
+    init(driver: (any SpeechDriver)? = nil,
+         silenceSleep: @escaping @Sendable () async throws -> Void = { try await Task.sleep(for: .milliseconds(1400)) }) {
+        self.driver = driver ?? AppleSpeechDriver()
+        self.silenceSleep = silenceSleep
+        self.driver.onPlayback = { [weak self] id, event in self?.handlePlayback(id: id, event: event) }
+        self.driver.onInputRoute = { [weak self] event in
+            guard let self, self.isListening else { return }
+            switch event {
+            case .changed(let name): self.inputName = name
+            case .lost: self.stopAll(); self.onFailure?()
             }
         }
+        self.driver.onInterruption = { [weak self] in
+            guard let self else { return }
+            self.stopAll()
+            // Notify during model processing too, so the owner can cancel that turn.
+            self.onFailure?()
+        }
     }
 
-    func authorize() async -> Bool {
-        let speech = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
-        }
-        let microphone = await AVAudioApplication.requestRecordPermission()
-        return speech && microphone
-    }
+    func authorize() async -> Bool { await driver.authorize() }
 
     func listen(language: ConversationLanguage, glassesMicrophone: Bool) throws {
-        stopListening()
-        stopPlayback()
-        var started = false
-        defer { if !started { stopListening() } }
-        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language.recognitionLocaleID)), recognizer.isAvailable else {
-            throw SpeechFailure.unavailable
-        }
-        let audio = AVAudioSession.sharedInstance()
-        try audio.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
-        try audio.setActive(true)
-        let selected: AVAudioSessionPortDescription
-        if glassesMicrophone {
-            // AVAudioSession identifies Bluetooth audio ports, not Meta hardware. Prefer the
-            // user's current HFP route; never claim an arbitrary headset is the glasses.
-            let inputs = audio.availableInputs?.filter { $0.portType == .bluetoothHFP } ?? []
-            if let current = audio.currentRoute.inputs.first(where: { $0.portType == .bluetoothHFP }),
-               let input = inputs.first(where: { $0.uid == current.uid }) {
-                selected = input
-            } else if inputs.count == 1, let input = inputs.first {
-                selected = input
-            } else {
-                throw inputs.isEmpty ? SpeechFailure.bluetoothMicrophoneMissing : SpeechFailure.ambiguousBluetoothInput
-            }
-        } else {
-            guard let input = audio.availableInputs?.first(where: { $0.portType == .builtInMic }) else { throw SpeechFailure.unavailable }
-            selected = input
-        }
-        try audio.setPreferredInput(selected)
-        guard let actual = audio.currentRoute.inputs.first(where: { $0.uid == selected.uid }) else { throw SpeechFailure.unavailable }
-        selectedInputUID = actual.uid
-        inputName = actual.portName
-        self.recognizer = recognizer
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        request.taskHint = .dictation
-        self.request = request
-        transcript = ""
-        committed = false
+        stopListening(); stopPlayback()
+        guard driver.recognitionAvailable(language: language) else { throw SpeechFailure.unavailable }
+        transcript = ""; committed = false
         let id = UUID()
-        listenID = id
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { throw SpeechFailure.unavailable }
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }
-        tapInstalled = true
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            let text = result?.bestTranscription.formattedString
-            let final = result?.isFinal ?? false
-            Task { @MainActor [weak self] in
-                guard let self, self.listenID == id, self.isListening else { return }
-                if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    self.transcript = text
-                    self.silenceTask?.cancel()
-                    self.silenceTask = Task { [weak self] in
-                        try? await Task.sleep(for: .milliseconds(1400))
-                        guard !Task.isCancelled, let self, self.listenID == id else { return }
-                        self.commit()
-                    }
-                    if final { self.commit() }
-                } else if error != nil {
-                    self.stopListening()
-                    self.onFailure?()
-                }
+        listenID = id; isListening = true
+        do {
+            let name = try driver.startRecognition(language: language, bluetoothMicrophone: glassesMicrophone) { [weak self] event in
+                self?.handleRecognition(event, id: id)
             }
+            if listenID == id, isListening { inputName = name }
+        } catch { stopListening(); throw error }
+    }
+
+    private func handleRecognition(_ event: SpeechRecognitionEvent, id: UUID) {
+        guard listenID == id, isListening, !committed else { return }
+        if let text = event.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            transcript = text
+            silenceTask?.cancel()
+            let sleep = silenceSleep
+            silenceTask = Task { [weak self] in
+                // Test clocks can deliberately deliver a stale timer after cancellation.
+                guard !Task.isCancelled else { return }
+                try? await sleep()
+                guard !Task.isCancelled, let self, self.listenID == id else { return }
+                self.commit()
+            }
+            if event.final { commit() }
+        } else if event.failed || event.final {
+            // An empty final has ended the platform recognizer too. Do not leave the UI
+            // claiming to listen with a dead recognition task or submit an empty question.
+            stopListening(); onFailure?()
         }
-        isListening = true
-        do { engine.prepare(); try engine.start() }
-        catch { stopListening(); throw SpeechFailure.unavailable }
-        started = true
     }
 
     func commit() {
@@ -142,67 +87,31 @@ final class SpeechService: NSObject, ObservableObject, AVSpeechSynthesizerDelega
     func stopListening() {
         listenID = UUID()
         silenceTask?.cancel(); silenceTask = nil
-        engine.stop()
-        if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
-        request?.endAudio(); task?.cancel()
-        task = nil; request = nil; recognizer = nil; isListening = false
-        selectedInputUID = nil; inputName = ""
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-
-    private func verifyInputRoute() {
-        guard isListening, let selectedInputUID else { return }
-        guard let actual = AVAudioSession.sharedInstance().currentRoute.inputs.first(where: { $0.uid == selectedInputUID }) else {
-            // A disconnected headset must not silently start sending the phone's microphone.
-            stopListening()
-            onFailure?()
-            return
-        }
-        inputName = actual.portName
+        isListening = false; inputName = ""
+        driver.stopRecognition()
     }
 
     func speak(_ text: String, language: ConversationLanguage) throws {
-        stopListening()
-        stopPlayback()
-        guard let voice = AVSpeechSynthesisVoice(language: language.speechLocaleID) else { throw SpeechFailure.voiceMissing }
-        let audio = AVAudioSession.sharedInstance()
-        try audio.setCategory(.playback, mode: .spokenAudio)
-        try audio.setActive(true)
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = voice
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        activeUtteranceID = ObjectIdentifier(utterance)
-        synthesizer.speak(utterance)
+        stopListening(); stopPlayback()
+        guard driver.voiceAvailable(language: language) else { throw SpeechFailure.voiceMissing }
+        let id = UUID()
+        activeUtteranceID = id
+        do { try driver.startPlayback(text: text, language: language, id: id) }
+        catch { activeUtteranceID = nil; driver.deactivateAudio(); throw error }
     }
 
-    private func stopPlayback() {
+    private func handlePlayback(id: UUID, event: SpeechPlaybackEvent) {
+        guard activeUtteranceID == id else { return }
         activeUtteranceID = nil
-        synthesizer.stopSpeaking(at: .immediate)
+        driver.deactivateAudio()
+        switch event {
+        case .finished: onSpeechFinished?()
+        case .cancelled: stopAll(); onFailure?()
+        }
     }
 
+    private func stopPlayback() { activeUtteranceID = nil; driver.stopPlayback() }
     func stopAll() { stopListening(); stopPlayback() }
 
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        // Carry only a Sendable identity across actors, not the AVSpeechUtterance itself.
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor [weak self] in
-            guard let self, self.activeUtteranceID == id else { return }
-            self.activeUtteranceID = nil
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            self.onSpeechFinished?()
-        }
-    }
-
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        let id = ObjectIdentifier(utterance)
-        Task { @MainActor [weak self] in
-            // Explicit Stop invalidates the identity first, so its delayed cancellation does
-            // not become a new failure or terminate a newer utterance.
-            guard let self, self.activeUtteranceID == id else { return }
-            self.stopAll()
-            self.onFailure?()
-        }
-    }
-
-    enum SpeechFailure: Error { case unavailable, bluetoothMicrophoneMissing, ambiguousBluetoothInput, voiceMissing }
+    enum SpeechFailure: Error, Equatable { case unavailable, bluetoothMicrophoneMissing, ambiguousBluetoothInput, voiceMissing }
 }

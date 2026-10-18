@@ -1,11 +1,54 @@
 import XCTest
 
 final class MVPFlowTests: XCTestCase {
-    private func launch() -> XCUIApplication {
+    private func launch(resetLanguage: Bool = true, additionalArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--mvp-ui-testing"]
+        if resetLanguage { app.launchArguments.append("--reset-mvp-language") }
+        app.launchArguments += additionalArguments
         app.launch()
         return app
+    }
+    func testLanguagePersistsAcrossAppTermination() {
+        let app = launch()
+        app.segmentedControls["conversation.language"].buttons["English"].tap()
+        app.terminate()
+        let restored = launch(resetLanguage: false)
+        XCTAssertTrue(restored.buttons["Start conversation"].waitForExistence(timeout: 10))
+        restored.segmentedControls["conversation.language"].buttons["中文"].tap()
+        restored.terminate()
+        let chinese = launch(resetLanguage: false)
+        XCTAssertTrue(chinese.buttons["开始对话"].waitForExistence(timeout: 10))
+    }
+    func testUnknownLanguageSettingFallsBackAndCanBeChanged() {
+        let app = launch(resetLanguage: false, additionalArguments: ["--mvp-test-language", "legacy-unknown"])
+        XCTAssertTrue(app.buttons["开始对话"].waitForExistence(timeout: 10))
+        app.segmentedControls["conversation.language"].buttons["English"].tap()
+        XCTAssertTrue(app.buttons["Start conversation"].exists)
+    }
+    func testSettingsAndBackgroundRecovery() {
+        let app = launch()
+        app.buttons["settings.open"].tap()
+        XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["授权眼镜相机"].exists)
+        app.buttons["完成"].tap()
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        let status = app.staticTexts["conversation.status"]
+        let paused = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "已暂停"), object: status)
+        XCTAssertEqual(XCTWaiter.wait(for: [paused], timeout: 10), .completed)
+        XCTAssertTrue(app.buttons["开始对话"].exists)
+        XCTAssertTrue(app.staticTexts["相机关闭"].exists)
+    }
+    func testProductionStartupWithoutRestoringAnyAccount() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--mvp-smoke-testing"]
+        app.launch()
+        XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["LOCAL FIXTURE · NO NETWORK / 本地假数据模式"].exists)
+        XCTAssertFalse(app.staticTexts["conversation.status"].label.contains("Meta SDK setup failed"))
+        app.buttons["settings.open"].tap()
+        XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
     }
     func testLanguageSwitchAndMinimalSurface() {
         let app = launch()
