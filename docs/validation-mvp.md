@@ -2,7 +2,9 @@
 
 Status: **development, local iOS gate BLOCKED, no iPhone installation yet**.
 
-Remote evidence: [CI run 39105084021](https://github.com/andywangyzfh/OpenVision/actions/runs/39105084021), code `ca3d4ed`, **PASS** on Xcode 26.6: actual iOS simulator app build/launch, 17 Core XCTest cases, 7 Subscription XCTest cases, and 3 UI fixture tests. This run predates the refresh-merge and 17-scenario flow-test additions below. Initial artifact upload skipped the hidden results directory; the CI log contains the successful test results, and the follow-up workflow fixes result-bundle upload. Remote evidence does not pass the requested local gate.
+Latest remote evidence: [CI run 39105717171](https://github.com/andywangyzfh/OpenVision/actions/runs/39105717171), code **`bafbb67ddfd2800830db92b8b99fb18fbc1a0012`**, **PASS** on Xcode 26.6 / Swift 6.3.3, iPhone 17 Pro simulator iOS 26.4.1. The run includes the current refresh/flow changes: 120 core assertions, 42 subscription assertions, 17 actual-VM scenarios, 17 Core XCTest cases, 7 Subscription XCTest cases, and 3 UI fixture tests. Actual iOS App compilation and simulator launch succeeded. [Download the redacted test evidence and xcresult bundle](https://github.com/andywangyzfh/OpenVision/actions/runs/39105717171/artifacts/12128452712).
+
+The earlier [ca3d4ed run](https://github.com/andywangyzfh/OpenVision/actions/runs/39105084021) also passed its iOS tests; its initial artifact uploader skipped a hidden directory, which the latest run fixed. Documentation-only follow-up commits do not change the tested application sources. **Neither remote run passes the requested local gate.**
 
 Environment: 2026-10-17, macOS, Swift 6.3.3 Command Line Tools; no full Xcode or installed iOS Simulator. The disk had approximately 15 GB available during the environment check. No real ChatGPT authorization, model inference, microphone, camera or device-install command has been executed.
 

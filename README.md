@@ -16,7 +16,7 @@ This is Andy’s development fork of [rayl15/OpenVision](https://github.com/rayl
 
 ## 本地开发与测试
 
-需要完整 Xcode（含 iOS Simulator）、Swift 6 和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。只有 Command Line Tools 时只能运行离线核心检查。目标 iOS 17.2+；Meta DAT 固定 1.0.1；当前 iOS SDK/设备兼容性仍需验证。
+需要完整 Xcode（含 iOS Simulator）和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。CI 固定使用已验证的 **Xcode 26.6 / Swift 6.3.3**；本机安装同版可复现该环境。只有 Command Line Tools 时只能运行离线检查。目标 iOS 17.2+；Meta DAT 固定 1.0.1；真实设备/固件兼容性仍需验证。
 
 ```sh
 brew install xcodegen
@@ -52,4 +52,4 @@ bash MVP/scripts/check-ios.sh
 
 在 App 中停止、清空会话、退出登录，并在 ChatGPT 的应用连接设置撤销授权，然后删除 OpenVision MVP。退出登录会清理本机凭据；远程撤销失败会显示提示。iOS Keychain 可能跨卸载保留，所以请先退出登录。
 
-此开发方案不刷眼镜固件、不越狱、不写入眼镜系统；使用官方 DAT 注册第三方 iPhone App。需要时从 Meta AI 中解除第三方连接，继续使用官方 App。尚未实测恢复过程，且不将软件可卸载等同于对退货/保修资格的保证。无需为了停用此 App 对眼镜执行出厂重置。
+第三方对话逻辑运行在 iPhone App；眼镜连接和官方开发组件通过 Meta AI / DAT 管理，组件安装或更新由官方 App 完成。需要时从 Meta AI 中解除第三方连接，继续使用官方 App。尚未实测恢复过程，且不将软件可卸载等同于对退货/保修资格的保证。无需为了停用此 App 对眼镜执行出厂重置。
