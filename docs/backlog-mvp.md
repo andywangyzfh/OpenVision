@@ -1,6 +1,6 @@
 # MVP backlog / GitHub issue index
 
-The fork's linked GitHub issues are the source of truth. This file indexes the scoped MVP and ten published follow-up issues. Do not expand the MVP by exposing unfinished upstream features in its main flow.
+The fork's linked GitHub issues are the source of truth. This file indexes the scoped MVP, ten deferred feature issues, and findings from local validation. Do not expand the MVP by exposing unfinished upstream features in its main flow.
 
 ## MVP tracking issue
 
@@ -15,6 +15,10 @@ The fork's linked GitHub issues are the source of truth. This file indexes the s
 **Acceptance links:** BUILD-01 through SOAK-01 in the acceptance document. Do not close solely because the source compiles or a mocked model answers.
 
 **GitHub issue:** https://github.com/andywangyzfh/OpenVision/issues/1
+
+## Local validation follow-up
+
+[Issue #13 — Investigate AVAudioSession main-thread warnings before device soak](https://github.com/andywangyzfh/OpenVision/issues/13): all local tests pass, but Xcode reports synchronous audio-session performance warnings. Measure responsiveness and HFP/photo transitions on the real device before AUDIO-02 / RES-01 / SOAK-01 sign-off; preserve cancellation and route ownership if scheduling changes are required. This is separate from adding new features.
 
 ## Deferred issues
 

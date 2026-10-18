@@ -2,7 +2,7 @@
 
 This is Andy’s development fork of [rayl15/OpenVision](https://github.com/rayl15/OpenVision), for iPhone + displayless Ray-Ban Meta Gen 3. Original MIT attribution is retained in [LICENSE](LICENSE). Build **MVP/OpenVisionMVP.xcodeproj**, not the upstream full-feature project.
 
-开发状态：核心代码已实现，尚未通过完整 iOS 本地与眼镜真机验收。详见 [验收标准](docs/acceptance-mvp.md) 和 [验证记录](docs/validation-mvp.md)。没有发布可安装的验收版本。
+开发状态：本地软件验收已通过（61 项 XCTest 全通过，2026-10-18，源码 `b49c1db`）；iPhone、眼镜及真实 GPT 订阅验收尚未执行。详见 [验收标准](docs/acceptance-mvp.md) 和 [验证记录](docs/validation-mvp.md)。没有发布可安装的验收版本。
 
 ## 第一版功能
 
@@ -16,7 +16,7 @@ This is Andy’s development fork of [rayl15/OpenVision](https://github.com/rayl
 
 ## 本地开发与测试
 
-需要完整 Xcode（含 iOS Simulator）和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。CI 固定使用已验证的 **Xcode 26.6 / Swift 6.3.3**；本机安装同版可复现该环境。只有 Command Line Tools 时只能运行离线检查。目标 iOS 17.2+；Meta DAT 固定 1.0.1；真实设备/固件兼容性仍需验证。
+需要完整 Xcode（含 iOS Simulator）和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。CI 固定使用已验证的 **Xcode 26.6 / Swift 6.3.3**；本机已用 Xcode 27.1 完成独立本地验收。只有 Command Line Tools 时只能运行离线检查。目标 iOS 17.2+；Meta DAT 固定 1.0.1；真实设备/固件兼容性仍需验证。
 
 ```sh
 brew install xcodegen
@@ -27,7 +27,7 @@ swift test --package-path MVP/Subscription
 bash MVP/scripts/check-ios.sh
 ```
 
-`check-local.sh` 执行 120 项核心行为断言、42 项认证/流处理断言、51 个实际对话 ViewModel 的异步场景、28 个 HTTP 异常场景、13 个账号存储场景及 61 项本地回调断言，以及 Swift 语法解析、plist 校验及工程生成。ViewModel 测试使用实际生产代码，硬件/账号/模型传输为离线替身。回调测试仅连接本机 127.0.0.1，使用合成授权码。**它不是 iOS 编译或完整验收通过。** `check-ios.sh` 自动寻找完整 Xcode、检查首次初始化，选择已安装的 iPhone 模拟器并执行实际 App 构建、生产控制层测试与 UI 测试；测试结果写到忽略提交的 `.test-results/`。UI fixture 明确无网络、无麦克风，也不会伪造成功的硬件拍照。其通过不能替代眼镜/真实账号测试。
+`check-local.sh` 执行 120 项核心行为断言、43 项认证/流处理断言、53 个实际对话 ViewModel 的异步场景、28 个 HTTP 异常场景、13 个账号存储场景及 61 项本地回调断言，以及 Swift 语法解析、plist 校验及工程生成。ViewModel 测试使用实际生产代码，硬件/账号/模型传输为离线替身。回调测试仅连接本机 127.0.0.1，使用合成授权码。**它不是 iOS 编译或完整验收通过。** `check-ios.sh` 自动寻找完整 Xcode、检查首次初始化，选择已安装的 iPhone 模拟器并执行实际 App 构建、生产控制层测试与 UI 测试；测试结果写到忽略提交的 `.test-results/`。UI fixture 明确无网络、无麦克风，也不会伪造成功的硬件拍照。其通过不能替代眼镜/真实账号测试。
 
 完整验收按 [两个 gate](docs/acceptance-mvp.md) 执行。GitHub CI 提供独立构建反馈，不能代替用户要求的本地测试。未通过本地 gate 前不进行 iPhone 安装。
 
