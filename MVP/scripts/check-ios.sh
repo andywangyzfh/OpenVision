@@ -32,6 +32,6 @@ xcodebuild test -project MVP/OpenVisionMVP.xcodeproj -scheme OpenVisionMVP \
   -destination "platform=iOS Simulator,id=$device_id" \
   -derivedDataPath .local-build/ios -clonedSourcePackagesDirPath .local-build/packages \
   -resultBundlePath "$result_path" \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= \
+  CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= \
   | tee .test-results/ios-tests.txt
 echo 'Simulator build/UI tests passed. Review every remaining A/S acceptance row before approving the local gate.'

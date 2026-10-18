@@ -29,12 +29,12 @@ private func drain() async {
 }
 
 @MainActor
-private func setup(signedIn: Bool = true) async throws -> (ConversationViewModel, FlowWorld) {
+private func setup(signedIn: Bool = true, sdkAvailable: Bool = true) async throws -> (ConversationViewModel, FlowWorld) {
     FlowWorld.current = FlowWorld()
     let world = FlowWorld.current
     UserDefaults.standard.set(ConversationLanguage.chinese.rawValue, forKey: "mvp.language")
     let account = ChatGPTAccountService()
-    let model = ConversationViewModel(account: account)
+    let model = ConversationViewModel(account: account, sdkAvailable: sdkAvailable)
     await drain() // Allow the initial signed-out observation to settle before restore.
     if signedIn {
         account.restoreSignedIn()
@@ -58,6 +58,28 @@ private func finishTurn(_ model: ConversationViewModel) async throws {
 @MainActor
 private func additionalScenarios() -> [(String, @MainActor () async throws -> Void)] {
     var scenarios: [(String, @MainActor () async throws -> Void)] = [
+        ("SDK initialization failure disables camera and callbacks while text account flow stays usable", {
+            let (vm, world) = try await setup(sdkAvailable: false); defer { vm.stop() }
+            try expect(!vm.glasses.sdkAvailable && vm.canSend, "SDK failure disabled usable account/text state")
+            await vm.toggleConversation()
+            vm.speech.emitUtterance("看看这个")
+            try expect(vm.status.contains("Meta SDK 初始化失败") && !vm.busy && !vm.conversationActive && !vm.speech.isListening, "SDK failure did not explain disabled photo or left voice session wedged")
+            try expect(world.requests.isEmpty && vm.glasses.captures == 0 && vm.messages.isEmpty, "Unavailable SDK photo reached a service")
+            await vm.handleRegistrationURL(URL(string: "openvisionmvp://registration?test=1")!)
+            try expect(vm.glasses.registrationURLs == 0, "Unavailable SDK registration URL reached driver")
+            vm.language = .english
+            try expect(vm.status.contains("Meta SDK initialization failed") && vm.glassesSetupMessage.contains("Text chat and account settings remain available"), "English SDK guidance missing")
+            send(vm, "Please answer without a photo"); try await finishTurn(vm)
+            try expect(world.requests.count == 1 && vm.glasses.captures == 0, "SDK failure broke text-only flow")
+            try expect(world.requests[0].turns.allSatisfy { $0.imageJPEG == nil }, "SDK failure used old image")
+        }),
+        ("configured SDK registration callback remains usable and unrelated URLs are ignored", {
+            let (vm, _) = try await setup(); defer { vm.stop() }
+            await vm.handleRegistrationURL(URL(string: "https://example.invalid/not-registration")!)
+            try expect(vm.glasses.registrationURLs == 0, "Unrelated URL reached SDK")
+            await vm.handleRegistrationURL(URL(string: "openvisionmvp://registration?test=1")!)
+            try expect(vm.glasses.registrationURLs == 1, "Explicit available SDK was permanently disabled")
+        }),
         ("short Mandarin speech turns reach the model unchanged", {
             let (vm, world) = try await setup(); defer { vm.stop() }
             await vm.toggleConversation()

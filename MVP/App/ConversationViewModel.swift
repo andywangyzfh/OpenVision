@@ -6,7 +6,10 @@ import SubscriptionCore
 @MainActor
 final class ConversationViewModel: ObservableObject {
     @Published var language: ConversationLanguage {
-        didSet { UserDefaults.standard.set(language.rawValue, forKey: "mvp.language"); stop() }
+        didSet {
+            UserDefaults.standard.set(language.rawValue, forKey: "mvp.language"); stop()
+            if !glasses.sdkAvailable && !preview { status = glassesSetupMessage }
+        }
     }
     @Published var useGlassesMicrophone = true
     @Published var draft = ""
@@ -32,12 +35,12 @@ final class ConversationViewModel: ObservableObject {
     private var startGeneration = UUID()
     private var accountObserver: AnyCancellable?
 
-    init(account: ChatGPTAccountService, preview: Bool = false) {
+    init(account: ChatGPTAccountService, preview: Bool = false, sdkAvailable: Bool = false) {
         self.account = account
         self.preview = preview
         client = ChatGPTPlanClient(account: account)
         speech = SpeechService()
-        glasses = GlassesPhotoService(monitoring: !preview)
+        glasses = GlassesPhotoService(monitoring: !preview, sdkAvailable: sdkAvailable)
         language = ConversationLanguage(rawValue: UserDefaults.standard.string(forKey: "mvp.language") ?? "") ?? .chinese
         speech.onUtterance = { [weak self] in self?.submit($0) }
         speech.onSpeechFinished = { [weak self] in
@@ -59,12 +62,23 @@ final class ConversationViewModel: ObservableObject {
                 else { self.stop(); self.models = []; self.modelID = "" }
             }
         }
+        if !sdkAvailable && !preview { status = glassesSetupMessage }
     }
 
     var ready: Bool { preview || account.isSignedIn }
     var canSend: Bool { ready && !busy && !modelID.isEmpty }
     var debugPreview: Bool { preview }
+    var glassesSetupMessage: String {
+        text("眼镜功能未配置：Meta SDK 初始化失败。请配置真实 Meta 应用及 Apple 签名后重新启动。文字聊天与账号设置仍可使用。", "Glasses features are not configured: Meta SDK initialization failed. Configure a real Meta app and Apple signing, then relaunch. Text chat and account settings remain available.")
+    }
     func text(_ chinese: String, _ english: String) -> String { language == .chinese ? chinese : english }
+
+    func handleRegistrationURL(_ url: URL) async {
+        guard url.scheme == "openvisionmvp" else { return }
+        guard glasses.sdkAvailable else { status = glassesSetupMessage; return }
+        do { try await glasses.handleRegistrationURL(url) }
+        catch { status = text("眼镜注册回调失败，请重新连接。", "Glasses registration callback failed. Reconnect.") }
+    }
 
     func connectAccount() async {
         guard !signingIn else { return }
@@ -150,6 +164,9 @@ final class ConversationViewModel: ObservableObject {
     }
 
     private func run(question: String, photo: Bool) {
+        guard !photo || glasses.sdkAvailable || preview else {
+            stop(); status = glassesSetupMessage; return
+        }
         guard activeForeground, canSend else {
             if !ready || modelID.isEmpty { showAccount = true }
             return
@@ -193,7 +210,9 @@ final class ConversationViewModel: ObservableObject {
                 guard lifecycle.isCurrent(id) else { return }
                 busy = false; lifecycle.stop(); stage = .idle
                 conversationActive = false
-                if error is GlassesPhotoService.PhotoFailure {
+                if (error as? GlassesPhotoService.PhotoFailure) == .sdkUnavailable {
+                    status = glassesSetupMessage
+                } else if error is GlassesPhotoService.PhotoFailure {
                     status = self.text("未能取得新照片。请检查眼镜连接和相机授权，再点击重试；没有发送旧图。", "No fresh photo was obtained. Check the glasses and camera permission, then retry; no old photo was sent.")
                 } else {
                     status = failureMessage(error)

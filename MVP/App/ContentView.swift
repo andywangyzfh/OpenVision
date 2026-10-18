@@ -18,6 +18,10 @@ struct MVPContentView: View {
                 if model.debugPreview {
                     Text("LOCAL FIXTURE · NO NETWORK / 本地假数据模式").font(.caption).foregroundStyle(.orange)
                 }
+                if !glasses.sdkAvailable && !model.debugPreview {
+                    Text(model.glassesSetupMessage).font(.caption).foregroundStyle(.orange)
+                        .accessibilityIdentifier("glasses.setup.status")
+                }
                 HStack {
                     Label(glasses.deviceCount > 0 ? model.text("眼镜已连接", "Glasses connected") : model.text("眼镜未连接", "Glasses disconnected"), systemImage: "eyeglasses")
                     Spacer()
@@ -56,7 +60,7 @@ struct MVPContentView: View {
                         .disabled(!model.canSend || model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityLabel(model.text("发送", "Send")).accessibilityIdentifier("conversation.send")
                     Button { model.sendDraft(photo: true) } label: { Image(systemName: "camera.fill").font(.title2) }
-                        .disabled(!model.canSend).accessibilityLabel(model.text("拍照问答", "Photo question")).accessibilityIdentifier("conversation.photo")
+                        .disabled(!model.canSend || (!glasses.sdkAvailable && !model.debugPreview)).accessibilityLabel(model.text("拍照问答", "Photo question")).accessibilityIdentifier("conversation.photo")
                 }
                 Text(model.text("照片仅用于本轮；会话不保存到磁盘。MVP 请保持 App 在前台。", "Photos are used for this turn only; chats are not saved to disk. Keep this MVP in the foreground."))
                     .font(.caption2).foregroundStyle(.secondary)
@@ -96,12 +100,17 @@ struct MVPContentView: View {
                 }
                 Section(model.text("眼镜", "Glasses")) {
                     Button(model.text("连接／注册眼镜", "Connect / register glasses")) { setup { try await glasses.register() } }
+                        .disabled(!glasses.sdkAvailable)
                     Button(model.text("安装／更新官方开发组件", "Install / update developer component")) { setup { try await glasses.installDeveloperComponent() } }
+                        .disabled(!glasses.sdkAvailable)
                     Button(model.text("授权眼镜相机", "Authorize glasses camera")) { setup {
                         let granted = try await glasses.authorizeCamera()
                         model.status = granted ? model.text("眼镜相机已授权。", "Glasses camera authorized.") : model.text("相机授权被拒绝，请在 Meta AI 中检查权限。", "Camera permission denied. Review permissions in Meta AI.")
                     } }
-                    Text(model.text("这些操作会打开官方 Meta AI App。", "These actions open the official Meta AI app.")).font(.caption)
+                    .disabled(!glasses.sdkAvailable)
+                    Text(glasses.sdkAvailable
+                         ? model.text("这些操作会打开官方 Meta AI App。", "These actions open the official Meta AI app.")
+                         : model.glassesSetupMessage).font(.caption)
                 }
                 Section(model.text("语音", "Speech")) {
                     Toggle(model.text("使用蓝牙麦克风（请连接眼镜）", "Use Bluetooth microphone (connect glasses)"), isOn: $model.useGlassesMicrophone)

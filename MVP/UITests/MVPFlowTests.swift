@@ -1,6 +1,7 @@
 import XCTest
 
 final class MVPFlowTests: XCTestCase {
+    @MainActor
     private func launch(resetLanguage: Bool = true, additionalArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--mvp-ui-testing"]
@@ -9,6 +10,7 @@ final class MVPFlowTests: XCTestCase {
         app.launch()
         return app
     }
+    @MainActor
     func testLanguagePersistsAcrossAppTermination() {
         let app = launch()
         app.segmentedControls["conversation.language"].buttons["English"].tap()
@@ -20,36 +22,58 @@ final class MVPFlowTests: XCTestCase {
         let chinese = launch(resetLanguage: false)
         XCTAssertTrue(chinese.buttons["开始对话"].waitForExistence(timeout: 10))
     }
+    @MainActor
     func testUnknownLanguageSettingFallsBackAndCanBeChanged() {
         let app = launch(resetLanguage: false, additionalArguments: ["--mvp-test-language", "legacy-unknown"])
         XCTAssertTrue(app.buttons["开始对话"].waitForExistence(timeout: 10))
         app.segmentedControls["conversation.language"].buttons["English"].tap()
         XCTAssertTrue(app.buttons["Start conversation"].exists)
     }
+    @MainActor
     func testSettingsAndBackgroundRecovery() {
         let app = launch()
         app.buttons["settings.open"].tap()
         XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["授权眼镜相机"].exists)
         app.buttons["完成"].tap()
-        XCUIDevice.shared.press(.home)
+        // Switching to a real system app exercises lifecycle transitions on runtimes
+        // whose synthetic Home key does not leave the foreground (e.g. iPhone Duo).
+        let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")
+        settings.launch()
+        let background = XCTNSPredicateExpectation(predicate: NSPredicate(
+            format: "state == %d OR state == %d",
+            XCUIApplication.State.runningBackground.rawValue,
+            XCUIApplication.State.runningBackgroundSuspended.rawValue
+        ), object: app)
+        XCTAssertEqual(XCTWaiter.wait(for: [background], timeout: 10), .completed, "App state: \(app.state.rawValue)")
         app.activate()
+        settings.terminate()
         let status = app.staticTexts["conversation.status"]
         let paused = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "已暂停"), object: status)
         XCTAssertEqual(XCTWaiter.wait(for: [paused], timeout: 10), .completed)
         XCTAssertTrue(app.buttons["开始对话"].exists)
         XCTAssertTrue(app.staticTexts["相机关闭"].exists)
     }
+    @MainActor
     func testProductionStartupWithoutRestoringAnyAccount() {
         let app = XCUIApplication()
         app.launchArguments = ["--mvp-smoke-testing"]
         app.launch()
         XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["LOCAL FIXTURE · NO NETWORK / 本地假数据模式"].exists)
-        XCTAssertFalse(app.staticTexts["conversation.status"].label.contains("Meta SDK setup failed"))
+        XCTAssertTrue(app.staticTexts["眼镜未连接"].exists || app.staticTexts["Glasses disconnected"].exists)
+        // Real configure() may succeed in developer mode. If it fails, the guarded
+        // configuration state must remain usable, without accessing Wearables.shared.
+        let setupFailed = app.staticTexts["glasses.setup.status"].exists
+        if setupFailed { XCTAssertTrue(app.staticTexts["glasses.setup.status"].label.contains("Meta SDK")) }
+        XCTAssertFalse(app.buttons["conversation.photo"].isEnabled)
         app.buttons["settings.open"].tap()
         XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
+        let authorize = app.buttons["授权眼镜相机"].exists ? app.buttons["授权眼镜相机"] : app.buttons["Authorize glasses camera"]
+        XCTAssertTrue(authorize.exists)
+        XCTAssertEqual(authorize.isEnabled, !setupFailed)
     }
+    @MainActor
     func testLanguageSwitchAndMinimalSurface() {
         let app = launch()
         XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 10))
@@ -58,6 +82,7 @@ final class MVPFlowTests: XCTestCase {
         XCTAssertTrue(app.buttons["Start conversation"].exists)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
+    @MainActor
     func testTextConversationFixtureAndClear() {
         let app = launch()
         app.segmentedControls["conversation.language"].buttons["English"].tap()
@@ -68,6 +93,7 @@ final class MVPFlowTests: XCTestCase {
         app.buttons["Clear"].tap()
         XCTAssertFalse(app.staticTexts["Local test reply. No model was called."].exists)
     }
+    @MainActor
     func testPhotoFailureNeverInventsScene() {
         let app = launch()
         app.buttons["conversation.photo"].tap()

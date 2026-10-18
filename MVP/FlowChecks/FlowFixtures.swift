@@ -117,7 +117,8 @@ final class SpeechService: ObservableObject {
 
 @MainActor
 final class GlassesPhotoService: ObservableObject {
-    enum PhotoFailure: Error { case noGlasses, capture }
+    enum PhotoFailure: Error { case sdkUnavailable, noGlasses, capture }
+    let sdkAvailable: Bool
     var cameraActive = false
     var captures = 0
     var completedCaptures = 0
@@ -126,7 +127,9 @@ final class GlassesPhotoService: ObservableObject {
     var failCapture = false
     var holdCapture = false
     var pendingCapture: CheckedContinuation<Data, Error>?
-    init(monitoring: Bool) {}
+    var registrationURLs = 0
+    init(monitoring: Bool, sdkAvailable: Bool = false) { self.sdkAvailable = sdkAvailable }
+    func handleRegistrationURL(_ url: URL) async throws { registrationURLs += 1 }
     func captureJPEG() async throws -> Data {
         captures += 1; cameraActive = true
         defer { cameraActive = false }

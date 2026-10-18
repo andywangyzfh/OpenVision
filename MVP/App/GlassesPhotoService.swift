@@ -17,6 +17,7 @@ final class GlassesPhotoService: ObservableObject {
     @Published private(set) var registered = false
     @Published private(set) var deviceCount = 0
     @Published private(set) var cameraActive = false
+    let sdkAvailable: Bool
     private let driver: any DATCameraDriver
     private let timing: Timing
     private var streaming = false
@@ -27,12 +28,13 @@ final class GlassesPhotoService: ObservableObject {
     private var cleanupTask: Task<Bool, Never>?
     private var failed = false
 
-    init(monitoring: Bool = true, driver: (any DATCameraDriver)? = nil, timing: Timing = Timing()) {
-        let selected = driver ?? WearablesCameraDriver(monitoring: monitoring)
+    init(monitoring: Bool = true, sdkAvailable: Bool = false, driver: (any DATCameraDriver)? = nil, timing: Timing = Timing()) {
+        let selected = driver ?? WearablesCameraDriver(sdkAvailable: sdkAvailable, monitoring: monitoring)
         self.driver = selected
         self.timing = timing
+        self.sdkAvailable = sdkAvailable
         // Preserve fixture mode: constructing monitoring:false must not access Wearables.shared.
-        guard monitoring || driver != nil else { return }
+        guard sdkAvailable, monitoring || driver != nil else { return }
         registered = selected.registered
         deviceCount = selected.deviceCount
         selected.connectionChanged = { [weak self] registered, count in
@@ -41,11 +43,14 @@ final class GlassesPhotoService: ObservableObject {
         }
     }
 
-    func register() async throws { try await driver.register() }
-    func installDeveloperComponent() async throws { try await driver.installDeveloperComponent() }
-    func authorizeCamera() async throws -> Bool { try await driver.authorizeCamera() }
+    private func requireSDK() throws { guard sdkAvailable else { throw PhotoFailure.sdkUnavailable } }
+    func register() async throws { try requireSDK(); try await driver.register() }
+    func installDeveloperComponent() async throws { try requireSDK(); try await driver.installDeveloperComponent() }
+    func authorizeCamera() async throws -> Bool { try requireSDK(); return try await driver.authorizeCamera() }
+    func handleRegistrationURL(_ url: URL) async throws { try requireSDK(); try await driver.handleRegistrationURL(url) }
 
     func captureJPEG() async throws -> Data {
+        try requireSDK()
         // Keep ownership through permission awaits and teardown. Stop invalidates this operation,
         // but a second capture cannot overtake it and then be closed by its late error handler.
         guard !captureInFlight else { throw PhotoFailure.busy }
@@ -102,6 +107,7 @@ final class GlassesPhotoService: ObservableObject {
 
     func stop() {
         operationGeneration += 1
+        guard sdkAvailable else { return }
         // Unstructured cleanup deliberately does not inherit the canceled capture's lifetime.
         // Retain hardware references until SDK teardown is confirmed.
         _ = startCleanup()
@@ -153,5 +159,5 @@ final class GlassesPhotoService: ObservableObject {
         }
     }
 
-    enum PhotoFailure: Error, Equatable { case busy, noGlasses, permission, capture, teardown }
+    enum PhotoFailure: Error, Equatable { case sdkUnavailable, busy, noGlasses, permission, capture, teardown }
 }

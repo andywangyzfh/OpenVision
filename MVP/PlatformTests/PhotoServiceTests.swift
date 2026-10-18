@@ -8,9 +8,72 @@ final class PhotoServiceTests: XCTestCase {
     @MainActor private var fast: GlassesPhotoService.Timing { GlassesPhotoService.Timing(sessionStart: 0.1, streamStart: 0.1, photo: 0.1, teardown: 0.08, poll: 0.002) }
 
     @MainActor
+    func testDefaultUnavailableDriverNeverAccessesUnconfiguredWearables() async throws {
+        let driver = WearablesCameraDriver()
+        XCTAssertFalse(driver.registered)
+        XCTAssertEqual(driver.deviceCount, 0)
+        XCTAssertFalse(driver.hasSession)
+        XCTAssertTrue(driver.sessionStopped)
+        let actions: [@MainActor () async throws -> Void] = [
+            { try await driver.register() },
+            { try await driver.installDeveloperComponent() },
+            { _ = try await driver.authorizeCamera() },
+            { _ = try await driver.cameraPermissionGranted() },
+            { try await driver.handleRegistrationURL(URL(string: "openvisionmvp://registration")!) }
+        ]
+        for action in actions {
+            do { try await action(); XCTFail("Unavailable driver action should fail") }
+            catch { XCTAssertEqual(error as? WearablesCameraDriver.DriverFailure, .sdkUnavailable) }
+        }
+        XCTAssertThrowsError(try driver.createAndStartSession()) { error in
+            XCTAssertEqual(error as? WearablesCameraDriver.DriverFailure, .sdkUnavailable)
+        }
+        XCTAssertThrowsError(try driver.attachCamera { _ in }) { error in
+            XCTAssertEqual(error as? WearablesCameraDriver.DriverFailure, .sdkUnavailable)
+        }
+        driver.startStream(); driver.stopHardware(); driver.releaseStoppedHardware()
+        XCTAssertFalse(driver.capturePhoto())
+        XCTAssertFalse(driver.hasSession)
+    }
+
+    @MainActor
+    func testDefaultUnavailableServiceRejectsAllSDKOperationsAndStopIsSafe() async {
+        let service = GlassesPhotoService()
+        XCTAssertFalse(service.sdkAvailable)
+        XCTAssertFalse(service.registered)
+        XCTAssertEqual(service.deviceCount, 0)
+        let actions: [@MainActor () async throws -> Void] = [
+            { try await service.register() },
+            { try await service.installDeveloperComponent() },
+            { _ = try await service.authorizeCamera() },
+            { try await service.handleRegistrationURL(URL(string: "openvisionmvp://registration")!) }
+        ]
+        for action in actions {
+            do { try await action(); XCTFail("Unavailable service action should fail") }
+            catch { XCTAssertEqual(error as? GlassesPhotoService.PhotoFailure, .sdkUnavailable) }
+        }
+        await expectFailure(.sdkUnavailable, service: service)
+        service.stop()
+        XCTAssertFalse(service.cameraActive)
+    }
+
+    @MainActor
+    func testUnavailableStatusRejectsInjectedDriverBeforeStartingHardware() async {
+        let driver = FakeDATCameraDriver()
+        let service = GlassesPhotoService(sdkAvailable: false, driver: driver, timing: fast)
+        await expectFailure(.sdkUnavailable, service: service)
+        service.stop()
+        XCTAssertEqual(driver.createCalls, 0)
+        XCTAssertEqual(driver.stopCalls, 0)
+        XCTAssertEqual(driver.releaseCalls, 0)
+        XCTAssertFalse(service.registered)
+        XCTAssertEqual(service.deviceCount, 0)
+    }
+
+    @MainActor
     func testFreshPhotoEachTurnAndOldCallbacksCannotPolluteNewTurn() async throws {
         let driver = FakeDATCameraDriver()
-        let service = GlassesPhotoService(driver: driver, timing: fast)
+        let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
         driver.photo = try fixture(.red)
         let first = try await service.captureJPEG()
         let old = try XCTUnwrap(driver.callbacks.first)
@@ -38,7 +101,7 @@ final class PhotoServiceTests: XCTestCase {
         let input = try XCTUnwrap(CGImageSourceCreateWithData(driver.photo! as CFData, nil))
         let inputProperties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(input, 0, nil) as? [String: Any])
         XCTAssertNotNil(inputProperties[kCGImagePropertyGPSDictionary as String])
-        let output = try await GlassesPhotoService(driver: driver, timing: fast).captureJPEG()
+        let output = try await GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast).captureJPEG()
         let source = try XCTUnwrap(CGImageSourceCreateWithData(output as CFData, nil))
         XCTAssertEqual(CGImageSourceGetType(source) as String?, "public.jpeg")
         let properties = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any])
@@ -52,7 +115,7 @@ final class PhotoServiceTests: XCTestCase {
     func testNoConnectedGlassesDoesNotStartHardware() async {
         for registered in [false, true] {
             let driver = FakeDATCameraDriver(); driver.registered = registered; driver.deviceCount = 0
-            await expectFailure(.noGlasses, service: GlassesPhotoService(driver: driver, timing: fast))
+            await expectFailure(.noGlasses, service: GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast))
             XCTAssertEqual(driver.createCalls, 0)
             XCTAssertFalse(driver.hasSession)
         }
@@ -61,7 +124,7 @@ final class PhotoServiceTests: XCTestCase {
     @MainActor
     func testDeniedPermissionDoesNotStartHardwareAndCleansOperation() async {
         let driver = FakeDATCameraDriver(); driver.permission = false
-        let service = GlassesPhotoService(driver: driver, timing: fast)
+        let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
         await expectFailure(.permission, service: service)
         XCTAssertEqual(driver.createCalls, 0)
         XCTAssertFalse(service.cameraActive)
@@ -76,7 +139,7 @@ final class PhotoServiceTests: XCTestCase {
     func testStartAttachCaptureAndStreamErrorsCleanHardware() async throws {
         for failure in FakeDATCameraDriver.FailurePoint.allCases {
             let driver = FakeDATCameraDriver(); driver.failure = failure; driver.photo = try fixture(.red)
-            let service = GlassesPhotoService(driver: driver, timing: fast)
+            let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
             do { _ = try await service.captureJPEG(); XCTFail("Expected \(failure)") }
             catch { /* driver errors and capture errors are surfaced to the caller */ }
             XCTAssertFalse(driver.hasSession, "\(failure)")
@@ -89,7 +152,7 @@ final class PhotoServiceTests: XCTestCase {
     func testEmptyAndDamagedImageDataFailAndClean() async {
         for data in [Data(), Data("not an image".utf8)] {
             let driver = FakeDATCameraDriver(); driver.photo = data
-            let service = GlassesPhotoService(driver: driver, timing: fast)
+            let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
             await expectFailure(.capture, service: service)
             XCTAssertFalse(driver.hasSession)
             XCTAssertFalse(service.cameraActive)
@@ -101,7 +164,7 @@ final class PhotoServiceTests: XCTestCase {
     func testSessionStreamAndPhotoTimeoutsClean() async {
         for stage in FakeDATCameraDriver.TimeoutStage.allCases {
             let driver = FakeDATCameraDriver(); driver.timeout = stage
-            let service = GlassesPhotoService(driver: driver, timing: fast)
+            let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
             await expectFailure(.capture, service: service)
             XCTAssertFalse(driver.hasSession, "\(stage)")
             XCTAssertFalse(service.cameraActive, "\(stage)")
@@ -113,7 +176,7 @@ final class PhotoServiceTests: XCTestCase {
     func testCancellationDuringPermissionAwaitNeverStartsHardware() async throws {
         for cancelTask in [false, true] {
             let driver = FakeDATCameraDriver(); driver.holdPermission = true
-            let service = GlassesPhotoService(driver: driver, timing: fast)
+            let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
             let task = Task { try await service.captureJPEG() }
             try await eventually { driver.permissionContinuation != nil }
             if cancelTask { task.cancel() }
@@ -129,7 +192,7 @@ final class PhotoServiceTests: XCTestCase {
     @MainActor
     func testCancellationYieldsAndWaitsForConfirmedTeardown() async throws {
         let driver = FakeDATCameraDriver(); driver.photo = nil; driver.stopImmediately = false
-        let service = GlassesPhotoService(driver: driver, timing: fast)
+        let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
         var finished = false
         let task = Task { defer { finished = true }; return try await service.captureJPEG() }
         try await eventually { driver.captureCalls == 1 }
@@ -151,7 +214,7 @@ final class PhotoServiceTests: XCTestCase {
     @MainActor
     func testNewCaptureCannotStartBeforePriorCleanupCompletes() async throws {
         let driver = FakeDATCameraDriver(); driver.photo = try fixture(.red); driver.stopImmediately = false
-        let service = GlassesPhotoService(driver: driver, timing: fast)
+        let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
         let first = Task { try await service.captureJPEG() }
         try await eventually { driver.stopCalls == 1 }
         await expectFailure(.busy, service: service)
@@ -165,7 +228,7 @@ final class PhotoServiceTests: XCTestCase {
     @MainActor
     func testTeardownTimeoutRetainsHandlesThenNextRequestRetriesCleanupFirst() async throws {
         let driver = FakeDATCameraDriver(); driver.photo = try fixture(.red); driver.stopImmediately = false
-        let service = GlassesPhotoService(driver: driver, timing: fast)
+        let service = GlassesPhotoService(sdkAvailable: true, driver: driver, timing: fast)
         await expectFailure(.teardown, service: service)
         XCTAssertTrue(driver.hasSession)
         XCTAssertTrue(service.cameraActive)
@@ -255,6 +318,7 @@ private final class FakeDATCameraDriver: DATCameraDriver {
     func register() async throws {}
     func installDeveloperComponent() async throws {}
     func authorizeCamera() async throws -> Bool { permission }
+    func handleRegistrationURL(_ url: URL) async throws {}
     func cameraPermissionGranted() async throws -> Bool {
         if holdPermission { return await withCheckedContinuation { permissionContinuation = $0 } }
         return permission

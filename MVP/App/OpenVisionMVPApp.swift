@@ -19,11 +19,10 @@ struct OpenVisionMVPApp: App {
         let preview = false
         let smoke = false
         #endif
-        var setupFailed = false
-        if !preview { do { try Wearables.configure() } catch { setupFailed = true } }
+        var sdkAvailable = false
+        if !preview { do { try Wearables.configure(); sdkAvailable = true } catch { /* Fail closed; never access Wearables.shared. */ } }
         let account = ChatGPTAccountService(restoreSession: !preview && !smoke)
-        let model = ConversationViewModel(account: account, preview: preview)
-        if setupFailed { model.status = "Meta SDK setup failed / Meta SDK 初始化失败" }
+        let model = ConversationViewModel(account: account, preview: preview, sdkAvailable: sdkAvailable)
         _account = StateObject(wrappedValue: account)
         _model = StateObject(wrappedValue: model)
     }
@@ -32,11 +31,7 @@ struct OpenVisionMVPApp: App {
         WindowGroup {
             MVPContentView(model: model, account: account, glasses: model.glasses, speech: model.speech)
                 .onOpenURL { url in
-                    guard url.scheme == "openvisionmvp" else { return }
-                    Task {
-                        do { _ = try await Wearables.shared.handleUrl(url) }
-                        catch { model.status = model.text("眼镜注册回调失败，请重新连接。", "Glasses registration callback failed. Reconnect.") }
-                    }
+                    Task { await model.handleRegistrationURL(url) }
                 }
         }
     }

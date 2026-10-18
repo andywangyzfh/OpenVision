@@ -44,13 +44,23 @@ targets:
         product: MWDATCore
       - package: MetaDAT
         product: MWDATCamera
+  OpenVisionMVPTestHost:
+    type: application
+    platform: iOS
+    sources: [TestHost]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp.testhost
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: TestHost/Simulator.entitlements
   OpenVisionMVPPlatformTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: PlatformTests
       # Compile the exact production control/storage sources in an isolated test bundle.
-      # No application host is launched, so tests cannot restore a user's account.
+      # The dedicated empty host has no account or hardware initialization.
       - path: App/GlassesPhotoService.swift
       - path: App/DATCameraDriver.swift
       - path: App/SpeechService.swift
@@ -58,6 +68,7 @@ targets:
       - path: App/Account/ChatGPTSessionStore.swift
       - path: App/Account/PlanCredentialStorage.swift
     dependencies:
+      - target: OpenVisionMVPTestHost
       - package: OpenVisionCore
       - package: SubscriptionCore
       - package: MetaDAT
@@ -68,6 +79,8 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp.platformtests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/OpenVisionMVPTestHost.app/OpenVisionMVPTestHost
+        BUNDLE_LOADER: $(TEST_HOST)
   OpenVisionMVPUITests:
     type: bundle.ui-testing
     platform: iOS

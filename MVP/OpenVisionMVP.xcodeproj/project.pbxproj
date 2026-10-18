@@ -19,6 +19,7 @@
 		37859C8D8F1B90F594B39AE0 /* DATCameraDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F620718991E6A0B35BC6884 /* DATCameraDriver.swift */; };
 		4049E01B979FC0485C0EC465 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 29679E824E140F95B7C8AF4F /* MWDATCamera */; };
 		46BAC1F7491997B0924BA6E6 /* PhotoServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BCFDC42FCECB403554C955D /* PhotoServiceTests.swift */; };
+		4E69F593D8D34A6D6287BF50 /* TestHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32140F24CA050E89EE9D31C /* TestHostApp.swift */; };
 		50540F8811140E22B83406A9 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 6ECCC4BB99454AD5A1C6AB38 /* MWDATCamera */; };
 		606133581EF7617D9E3D8988 /* SpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C87770A63FF9D18C046BDB /* SpeechService.swift */; };
 		60BD1F21597574363B031D2D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F004EA4E917AF1EAA0C649 /* ContentView.swift */; };
@@ -41,6 +42,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		02E99DD092B2E9E9894FFE28 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0046DF54E17E63C99DF0A0CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0E39C7D5365D084145196D0E;
+			remoteInfo = OpenVisionMVPTestHost;
+		};
 		E27BB6CE9083481EC87C9630 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0046DF54E17E63C99DF0A0CE /* Project object */;
@@ -54,6 +62,7 @@
 		00C87770A63FF9D18C046BDB /* SpeechService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechService.swift; sourceTree = "<group>"; };
 		157BAF3B9820F1865EE97A69 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
 		15ACD63A20DB81172E5231B7 /* Subscription */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Subscription; path = Subscription; sourceTree = SOURCE_ROOT; };
+		17B88B2ACAC67629418C867C /* OpenVisionMVPTestHost.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenVisionMVPTestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1EA4AD53B890DDCFE01B81D4 /* MVPFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MVPFlowTests.swift; sourceTree = "<group>"; };
 		20EFA66F1F5BE6BC1BCB8E3A /* ChatGPTPlanClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTPlanClient.swift; sourceTree = "<group>"; };
 		34E1809BB5CF2F7A88C57210 /* PlanCredentialStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanCredentialStorage.swift; sourceTree = "<group>"; };
@@ -67,9 +76,11 @@
 		9006AFA19A1993A3227CF96D /* OpenVisionMVP.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenVisionMVP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		90F004EA4E917AF1EAA0C649 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		991F0934676E33F0AE6C2C53 /* SpeechServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechServiceTests.swift; sourceTree = "<group>"; };
+		A32140F24CA050E89EE9D31C /* TestHostApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostApp.swift; sourceTree = "<group>"; };
 		AA39192B428433EB81A94DD7 /* PlanAuthCallback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanAuthCallback.swift; sourceTree = "<group>"; };
 		B4555963A1FC7F3FFFD13FF6 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTAccountService.swift; sourceTree = "<group>"; };
+		CA24CD927CC2B5236ED065FF /* Simulator.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Simulator.entitlements; sourceTree = "<group>"; };
 		E7F935363771A343E3E36A08 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		E9DD6BB35A33AA4F52EC7F7C /* OpenVisionMVPUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenVisionMVPUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ECB2C6A9DF25272B9A95EB32 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
@@ -138,6 +149,7 @@
 			children = (
 				9006AFA19A1993A3227CF96D /* OpenVisionMVP.app */,
 				82A1D9160CA8E94DA4B01AD5 /* OpenVisionMVPPlatformTests.xctest */,
+				17B88B2ACAC67629418C867C /* OpenVisionMVPTestHost.app */,
 				E9DD6BB35A33AA4F52EC7F7C /* OpenVisionMVPUITests.xctest */,
 			);
 			name = Products;
@@ -149,6 +161,15 @@
 				1EA4AD53B890DDCFE01B81D4 /* MVPFlowTests.swift */,
 			);
 			path = UITests;
+			sourceTree = "<group>";
+		};
+		DB06D46442BE06717C4300B0 /* TestHost */ = {
+			isa = PBXGroup;
+			children = (
+				CA24CD927CC2B5236ED065FF /* Simulator.entitlements */,
+				A32140F24CA050E89EE9D31C /* TestHostApp.swift */,
+			);
+			path = TestHost;
 			sourceTree = "<group>";
 		};
 		E8904A76C10E2A384ABCF892 /* Resources */ = {
@@ -181,6 +202,7 @@
 				4C2CC0A19E374EE68A55BB46 /* Packages */,
 				03021EF36ED4EC83242AFF01 /* PlatformTests */,
 				E8904A76C10E2A384ABCF892 /* Resources */,
+				DB06D46442BE06717C4300B0 /* TestHost */,
 				8FF027713D604195C2AA47C8 /* UITests */,
 				77384E3AD9CADBA84915F331 /* Products */,
 			);
@@ -189,6 +211,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0E39C7D5365D084145196D0E /* OpenVisionMVPTestHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 64377D805FA8F2536A6A8292 /* Build configuration list for PBXNativeTarget "OpenVisionMVPTestHost" */;
+			buildPhases = (
+				E5F963026A11512909357758 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenVisionMVPTestHost;
+			packageProductDependencies = (
+			);
+			productName = OpenVisionMVPTestHost;
+			productReference = 17B88B2ACAC67629418C867C /* OpenVisionMVPTestHost.app */;
+			productType = "com.apple.product-type.application";
+		};
 		280056A220290CB8CFE2C5DF /* OpenVisionMVPPlatformTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 25FFAF9911082EB653E3D06B /* Build configuration list for PBXNativeTarget "OpenVisionMVPPlatformTests" */;
@@ -199,6 +238,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				23B12098AFE35C68C3543AFD /* PBXTargetDependency */,
 			);
 			name = OpenVisionMVPPlatformTests;
 			packageProductDependencies = (
@@ -261,6 +301,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					0E39C7D5365D084145196D0E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
 					280056A220290CB8CFE2C5DF = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
@@ -297,6 +341,7 @@
 			projectRoot = "";
 			targets = (
 				33398CCAD34830DD4401D99C /* OpenVisionMVP */,
+				0E39C7D5365D084145196D0E /* OpenVisionMVPTestHost */,
 				280056A220290CB8CFE2C5DF /* OpenVisionMVPPlatformTests */,
 				986B43ED1FB5839E1FA36ECE /* OpenVisionMVPUITests */,
 			);
@@ -350,6 +395,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E5F963026A11512909357758 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4E69F593D8D34A6D6287BF50 /* TestHostApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F63309B26776A0ADB8975777 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -361,6 +414,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		23B12098AFE35C68C3543AFD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0E39C7D5365D084145196D0E /* OpenVisionMVPTestHost */;
+			targetProxy = 02E99DD092B2E9E9894FFE28 /* PBXContainerItemProxy */;
+		};
 		C6399DA994263A5EB936B1EB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 33398CCAD34830DD4401D99C /* OpenVisionMVP */;
@@ -394,6 +452,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp.platformtests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenVisionMVPTestHost.app/OpenVisionMVPTestHost";
 			};
 			name = Debug;
 		};
@@ -450,6 +509,23 @@
 			};
 			name = Debug;
 		};
+		98BF3EE9D387F88729695217 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = TestHost/Simulator.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp.testhost;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		9BA080FA5F66828FA0F89B05 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -463,6 +539,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp.platformtests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OpenVisionMVPTestHost.app/OpenVisionMVPTestHost";
 			};
 			name = Release;
 		};
@@ -599,6 +676,23 @@
 			};
 			name = Release;
 		};
+		D513063E839A4736BDF9B786 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = TestHost/Simulator.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.andywang.openvision.mvp.testhost;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		E674C2C63F3A7E302BA697FD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -635,6 +729,15 @@
 			buildConfigurations = (
 				1BBCDF3C74C5ACF2A8BF65DA /* Debug */,
 				9BA080FA5F66828FA0F89B05 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		64377D805FA8F2536A6A8292 /* Build configuration list for PBXNativeTarget "OpenVisionMVPTestHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D513063E839A4736BDF9B786 /* Debug */,
+				98BF3EE9D387F88729695217 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
