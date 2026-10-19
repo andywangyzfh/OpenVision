@@ -15,6 +15,8 @@ final class FlowWorld {
     }
     var catalog = [PlanModel(id: "fixture-plan", name: "Offline fixture model")]
     var modelLoads = 0
+    var modelsError: PlanError?
+    var invalidateBeforeModelsError = false
     var requests: [Request] = []
     var holdResponses = false
     var responseError: (any Error)?
@@ -36,9 +38,14 @@ final class FlowWorld {
 @MainActor
 final class ChatGPTPlanClient {
     private let world: FlowWorld
-    init(account: ChatGPTAccountService) { world = .current }
+    private let account: ChatGPTAccountService
+    init(account: ChatGPTAccountService) { world = .current; self.account = account }
     func models() async throws -> [PlanModel] {
         world.modelLoads += 1
+        if let error = world.modelsError {
+            if world.invalidateBeforeModelsError { account.invalidate() }
+            throw error
+        }
         return world.catalog
     }
     func respond(model: String, instructions: String, turns: [PlanTurn]) async throws -> String {
@@ -68,6 +75,10 @@ final class ChatGPTAccountService: ObservableObject {
     var pendingSignOut: CheckedContinuation<Void, Never>?
     var pendingCleanup: CheckedContinuation<Void, Never>?
     func restoreSignedIn() { isSignedIn = true }
+    func invalidate() {
+        signOutNotice = "订阅登录已失效，请重新登录 ChatGPT。 / Your plan sign-in expired or was revoked."
+        isSignedIn = false
+    }
     func restoreSavedSession() async throws { try await signIn() }
     func signIn() async throws {
         signInCalls += 1

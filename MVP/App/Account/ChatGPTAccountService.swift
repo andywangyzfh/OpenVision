@@ -45,11 +45,11 @@ final class ChatGPTAccountService: NSObject, ObservableObject, ASWebAuthenticati
                     if self.isSignedIn { self.accountLabel = value.label }
                 } else {
                     self.isSignedIn = false; self.accountLabel = ""
+                    self.signOutNotice = self.needsLocalCleanupRetry
+                        ? Self.notice(for: SessionSignOutResult(local: state.cleanup, remote: .unconfirmed))
+                        : "订阅登录已失效，请重新登录 ChatGPT。\nYour plan sign-in expired or was revoked. Sign in to ChatGPT again."
                 }
                 self.identityUIRevision += 1
-                if self.needsLocalCleanupRetry {
-                    self.signOutNotice = Self.notice(for: SessionSignOutResult(local: state.cleanup, remote: .unconfirmed))
-                }
             }
         }
         // No startup read/probe, including when an old credential cannot be deleted. A saved

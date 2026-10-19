@@ -275,6 +275,23 @@ struct FlowChecks {
         }
         defer { restoreDefaults() }
         let scenarios: [(String, @MainActor () async throws -> Void)] = [
+            ("reauthentication notification stops a pending turn and preserves its visible reason", {
+                let (vm, world) = try await setup(); defer { vm.stop() }
+                world.holdResponses = true; send(vm, "请回答这个问题")
+                try await eventually("request waiting before invalidation") { world.pendingResponses.count == 1 }
+                vm.account.invalidate(); await drain()
+                try expect(!vm.ready && !vm.busy && vm.status.contains("已失效"), "Account invalidation hid its reason behind the old thinking status")
+                let reason = vm.status
+                world.resolveResponses(); await drain()
+                try expect(vm.status == reason && vm.speech.spoken.isEmpty, "Old response replaced the reauthentication reason or spoke")
+            }),
+            ("current model failure remains visible when account invalidation arrives first", {
+                let (vm, world) = try await setup(); defer { vm.stop() }
+                world.modelsError = .reauthenticationRequired
+                world.invalidateBeforeModelsError = true
+                await vm.refreshModels(); await drain()
+                try expect(!vm.ready && vm.models.isEmpty && vm.status.contains("已失效"), "Invalidation hid the current expired-login error")
+            }),
             ("background cancels sign-in UI and an old completion cannot clear a new attempt", {
                 let (vm, _) = try await setup(); defer { vm.stop() }
                 await vm.signOut(); await drain()

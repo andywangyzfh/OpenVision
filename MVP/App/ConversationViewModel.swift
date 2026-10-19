@@ -60,7 +60,10 @@ final class ConversationViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, !self.preview, signedIn == self.account.isSignedIn else { return }
                 if signedIn { await self.refreshModels() }
-                else { self.stop(); self.models = []; self.modelID = "" }
+                else {
+                    self.stop(); self.models = []; self.modelID = ""
+                    if let notice = self.account.signOutNotice { self.status = notice }
+                }
             }
         }
         if !sdkAvailable && !preview { status = glassesSetupMessage }
@@ -117,7 +120,7 @@ final class ConversationViewModel: ObservableObject {
                 ? text("账号没有返回可用模型，请检查订阅授权。", "No models were returned. Check your plan authorization.")
                 : text("已连接。可在 ChatGPT 设置核对本应用的用量与限额。", "Connected. Review this app's usage and limits in ChatGPT Settings.")
         } catch {
-            guard account.isSignedIn, accountActionGeneration == generation else { return }
+            guard accountActionGeneration == generation else { return }
             status = failureMessage(error)
         }
     }

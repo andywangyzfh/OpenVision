@@ -212,6 +212,19 @@ final class AccountCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testRealStoreInvalidationPublishesVisibleReauthenticationReasonAfterSuccessfulCleanup() async throws {
+        let fixture = CoordinatorFixture(notifications: .default)
+        let service = fixture.service()
+        try await service.signIn()
+        await fixture.store.invalidate()
+        try await coordinatorEventually { !service.isSignedIn && service.signOutNotice != nil }
+        XCTAssertEqual(service.localCleanupState, .removed)
+        XCTAssertTrue(service.signOutNotice?.contains("已失效") == true)
+        XCTAssertTrue(service.signOutNotice?.contains("expired or was revoked") == true)
+        XCTAssertNil(fixture.storage.saved)
+    }
+
+    @MainActor
     func testLateInvalidationNotificationDoesNotClearNewSuccessfulLogin() async throws {
         let fixture = CoordinatorFixture()
         let service = fixture.service()
@@ -219,7 +232,7 @@ final class AccountCoordinatorTests: XCTestCase {
         let current = try XCTUnwrap(fixture.storage.saved)
         let lookups = fixture.storeLookups.value
         // This deliberately tests the observer itself with an isolated notification center.
-        // Store -> default NotificationCenter delivery remains a separate integration boundary.
+        // Real Store -> default NotificationCenter delivery is covered by the preceding test.
         fixture.notifications.post(name: .chatGPTReauthenticationRequired, object: nil)
         try await coordinatorEventually { fixture.storeLookups.value > lookups }
         await coordinatorDrain()
@@ -235,13 +248,14 @@ private final class CoordinatorFixture {
     let store: ChatGPTSessionStore
     let metadata = CoordinatorMetadata()
     let effects = CoordinatorEffects()
-    let notifications = NotificationCenter()
+    let notifications: NotificationCenter
     let storeLookups = CoordinatorCounter()
     var authorizations = 0
     var cancellations = 0
     var invalidCallback = false
     var lastAttempt: SignInAttempt?
-    init(storage: CoordinatorCredentialStorage = CoordinatorCredentialStorage(initial: nil)) {
+    init(storage: CoordinatorCredentialStorage = CoordinatorCredentialStorage(initial: nil), notifications: NotificationCenter = NotificationCenter()) {
+        self.notifications = notifications
         self.storage = storage
         store = ChatGPTSessionStore(storage: storage, refreshOperation: { _ in throw PlanError.service("unexpected_fixture_refresh") }, revocationOperation: { _ in true })
     }
