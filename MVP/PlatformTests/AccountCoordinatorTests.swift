@@ -142,6 +142,43 @@ final class AccountCoordinatorTests: XCTestCase {
     }
 
     @MainActor
+    func testCancelledLateTokenAndIdentityFailuresCannotModifyNewSuccessfulLogin() async throws {
+        for identityStage in [false, true] {
+            let fixture = CoordinatorFixture()
+            if identityStage { await fixture.effects.setHoldIdentity(true) }
+            else { await fixture.effects.setHoldToken(true) }
+            let service = fixture.service()
+            let old = Task { try await service.signIn() }
+            try await coordinatorEventually {
+                if identityStage { return await fixture.effects.pendingIdentityCount == 1 }
+                return await fixture.effects.pendingTokenCount == 1
+            }
+            service.cancelSignIn()
+            await fixture.effects.setHoldToken(false); await fixture.effects.setHoldIdentity(false)
+            try await service.signIn()
+            let current = try XCTUnwrap(fixture.storage.saved)
+            let registration = fixture.metadata.savedRegistration
+            let cancellations = fixture.cancellations
+            let failure = PlanError.service("synthetic_late_failure")
+            if identityStage { await fixture.effects.releaseIdentity(0, failure: failure) }
+            else { await fixture.effects.releaseToken(0, failure: failure) }
+            do { try await old.value; XCTFail("Old failed stage unexpectedly succeeded") }
+            catch { XCTAssertEqual(error as? PlanError, failure) }
+            XCTAssertTrue(service.isSignedIn)
+            XCTAssertFalse(service.isSigningIn)
+            XCTAssertNil(service.signOutNotice)
+            XCTAssertEqual(service.accountLabel, current.label)
+            XCTAssertEqual(fixture.storage.saved?.accessToken, current.accessToken)
+            XCTAssertEqual(fixture.storage.saves, 1)
+            XCTAssertEqual(fixture.metadata.savedRegistration?.clientID, registration?.clientID)
+            XCTAssertEqual(fixture.metadata.savedRegistration?.subject, registration?.subject)
+            XCTAssertEqual(fixture.cancellations, cancellations)
+            let state = await fixture.store.uiState()
+            XCTAssertEqual(state.credentials?.accessToken, current.accessToken)
+        }
+    }
+
+    @MainActor
     func testDuplicateOAuthAndResumeAreRejectedWhileTokenRequestIsPending() async throws {
         let fixture = CoordinatorFixture()
         await fixture.effects.setHoldToken(true)
@@ -351,10 +388,18 @@ private actor CoordinatorEffects {
         if holdIdentity { return try await withCheckedThrowingContinuation { identityWaiters[index] = $0 } }
         return identityResult(index)
     }
-    func releaseToken(_ index: Int) {
-        if let continuation = tokenWaiters.removeValue(forKey: index) { continuation.resume(with: Result { try tokenReply(index) }) }
+    func releaseToken(_ index: Int, failure: PlanError? = nil) {
+        if let continuation = tokenWaiters.removeValue(forKey: index) {
+            if let failure { continuation.resume(throwing: failure) }
+            else { continuation.resume(with: Result { try tokenReply(index) }) }
+        }
     }
-    func releaseIdentity(_ index: Int) { identityWaiters.removeValue(forKey: index)?.resume(returning: identityResult(index)) }
+    func releaseIdentity(_ index: Int, failure: PlanError? = nil) {
+        if let continuation = identityWaiters.removeValue(forKey: index) {
+            if let failure { continuation.resume(throwing: failure) }
+            else { continuation.resume(returning: identityResult(index)) }
+        }
+    }
     private func tokenReply(_ index: Int) throws -> TokenReply {
         try JSONDecoder().decode(TokenReply.self, from: JSONSerialization.data(withJSONObject: [
             "access_token": "synthetic-access-\(tokens[index]["code"] ?? "missing")", "refresh_token": "synthetic-refresh",
