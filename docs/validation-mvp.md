@@ -1,6 +1,8 @@
 # Validation record / 实测记录
 
-2026-10-18：**Gate 1 本地软件验收 PASS；Gate 2 真机／真实账号 NOT RUN。** 没有安装到 iPhone，没有进行真实 GPT 推理或付费 API 调用。
+2026-10-18 更新：**整体 NOT ACCEPTED。原有61项本地自动测试通过，但不等于真实登录/联网可用，也不证明所有安全边界完整。** 独立Submission Review新增A21～A25，其中A22发现退出凭据删除失败不被报告，跟踪[#14](https://github.com/andywangyzfh/OpenVision/issues/14)；其余补测跟踪[#15](https://github.com/andywangyzfh/OpenVision/issues/15)。当前扩展S0未闭合，S1真实订阅/联网、S2手机/眼镜均未测。完整逐项状态以 [测试清单](test-plan-mvp.md) 和 [独立Review](test-plan-review-mvp.md) 为准。
+
+以下保留原固定提交的**历史执行证据**；本轮没有复跑这61项，也没有安装到iPhone、真实登录、模型推理或付费API调用。旧“Gate 1 PASS”只适用于旧清单，不能继续作为安全完备或产品可用的结论。
 
 测试源码：`b49c1db73780c18befc67cb4f6db5c84596874e0`。从该提交导出干净源码副本执行构建和测试；后续仅修改验收文档不改变被测代码。环境：macOS 26.6.2 (25G83)、Xcode 27.1 (27A9275)、iOS Simulator 27.1 (24A94425)、arm64；专用设备 `iPhone Duo OpenVision MVP`。Meta DAT 固定 1.0.1。Xcode 许可及首次初始化已由用户完成；命令通过 `DEVELOPER_DIR` 选择 Xcode，未修改全局 Command Line Tools 选择。
 
@@ -20,7 +22,7 @@
 
 实际构建使用 `xcodebuild build-for-testing`、generic iOS Simulator destination；完整执行使用 `test-without-building`、指定上述专用模拟器、关闭并行测试、临时本地签名 `CODE_SIGN_IDENTITY=-`。无需 Apple 账号、真实证书或手机。标准包测试使用完整 Xcode 的 `swift test`。
 
-## Gate 1 逐项结论
+## 旧17项本地条件的历史证据（不含新增A21～A25）
 
 | 条件 | 结果 | 对应证据 |
 | --- | --- | --- |
@@ -58,7 +60,7 @@ Xcode 留下 AVAudioSession 主线程激活／停用的运行时性能警告，�
 
 ## 证据及复现
 
-本地完整证据（日志、结构化摘要、xcresult、源码 SHA 和环境）保存于本任务的 `outputs/OpenVision-MVP-validation/local-b49c1db/`，不提交原始用户内容。最终 xcresult：`Final-b49c1db.xcresult`。远程 [CI 39113878097](https://github.com/andywangyzfh/OpenVision/actions/runs/39113878097) 对应相同代码，状态以 Actions 为准；本地结论由本机实际运行建立。
+本地完整证据（日志、结构化摘要、xcresult、源码 SHA 和环境）保存于本任务的 `outputs/OpenVision-MVP-validation/local-b49c1db/`，不提交原始用户内容。最终 xcresult：`Final-b49c1db.xcresult`。远程 [CI 39113878097](https://github.com/andywangyzfh/OpenVision/actions/runs/39113878097) 对应相同代码，现已完成并为 **success**；这些仍只证明相同的自动测试，不证明真实账号或眼镜。
 
 ```sh
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
@@ -74,3 +76,5 @@ MVP_SIMULATOR_ID=<available-simulator-udid> MVP_BUILD_ROOT=/private/tmp/openvisi
 ## Gate 2 保持 NOT RUN
 
 真实 iPhone 安装／签名、眼镜注册及权限、实际中文／英文 STT/TTS 与蓝牙输入、HFP／拍照交替、真实 A/B 拍照、GPT 订阅账号授权及文字／图片推理、断网与锁屏中断、20 分钟稳定性测试，均待后续执行。按照用户要求，本轮不依赖手机。PR 保持 draft，跟踪 issue #1；尚不能称为真机验收或可发布版本。
+
+本轮已重新生成静态审计 `privacy-review-current-b49c1db.txt`（同本地证据目录），记录当前b49生产源码与SHA256；它替代旧文件中混合c6e0c1b/后附说明的审计引用，但不替代O16/H22动态日志与容器检查。

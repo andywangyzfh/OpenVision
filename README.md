@@ -2,7 +2,7 @@
 
 This is Andy’s development fork of [rayl15/OpenVision](https://github.com/rayl15/OpenVision), for iPhone + displayless Ray-Ban Meta Gen 3. Original MIT attribution is retained in [LICENSE](LICENSE). Build **MVP/OpenVisionMVP.xcodeproj**, not the upstream full-feature project.
 
-开发状态：本地软件验收已通过（61 项 XCTest 全通过，2026-10-18，源码 `b49c1db`）；iPhone、眼镜及真实 GPT 订阅验收尚未执行。详见 [验收标准](docs/acceptance-mvp.md) 和 [验证记录](docs/validation-mvp.md)。没有发布可安装的验收版本。
+开发状态：**整体尚未验收**。源码 `b49c1db` 的原有61项自动测试已通过，但独立Review新增的退出安全与测试边界缺口尚待闭合，真实订阅登录/联网及iPhone眼镜均未测。以 [完整测试清单与当前状态](docs/test-plan-mvp.md)、[独立Review](docs/test-plan-review-mvp.md) 为入口；历史结果见 [实测记录](docs/validation-mvp.md)。没有发布可安装的验收版本。
 
 ## 第一版功能
 

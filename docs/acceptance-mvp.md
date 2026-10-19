@@ -1,5 +1,7 @@
 # Bilingual MVP acceptance / 双语 MVP 验收
 
+2026-10-18 独立Review更新：当前**整体未验收**。执行入口与逐项状态以 [完整测试用例](test-plan-mvp.md)、[执行登记CSV](test-cases-mvp.csv) 和 [独立Review](test-plan-review-mvp.md) 为准。新增本地安全前置A21～A25尚待闭合；原61项PASS只保留为历史集合结果。真实联网S1单独先于手机S2，不能把它统称“缺手机所以没测”。
+
 This is the release contract, **not a record that the checks have passed**. Record actual results against the tested Git commit in the evidence table below. A parser check, mocked test, simulator run and glasses test establish different facts and must not be substituted for one another.
 
 ## Scope
@@ -43,7 +45,7 @@ Levels: **A** = deterministic automated test with fixtures/mocks; **S** = simula
 | PRIV-01 | A/review | Search the MVP's reachable logging/storage paths. No access/refresh token, OAuth code, authorization header, raw photo, full user transcript or full model reply is logged or retained by default. Redacted operational state and synthetic test fixtures are acceptable. New secrets/config are gitignored. |
 | LIFE-01 | A/S | Cancel, navigate away, language switch and app suspension invalidate the active turn and release recognition/camera resources. A late callback after suspension cannot resume recording or speech. On return, the app is usable and requires an explicit new start if the old turn was canceled. |
 
-**Local gate passes only when BUILD-01/02/03 and all locally executable A/S checks above pass.** A successful `swiftc -parse`, portable policy harness or source review alone is partial evidence. Missing Xcode or inability to run the application leaves the local gate BLOCKED. Do not describe that state as “full local testing complete” or proceed with iPhone installation as though it passed.
+**扩展本地S0还必须完成新清单A21/A22及Review要求的A23～A25处理；上表原17项通过本身不再表示扩展S0已闭合。** 原本地集合要求BUILD-01/02/03及所列A/S条件通过。 A successful `swiftc -parse`, portable policy harness or source review alone is partial evidence. Missing Xcode or inability to run the application leaves the local gate BLOCKED. Do not describe that state as “full local testing complete” or proceed with iPhone installation as though it passed.
 
 ## Gate 2: installation and device acceptance
 
@@ -95,8 +97,8 @@ Append results here or link to a redacted report in the fork. Initial status bel
 | Previous remote CI | `bafbb67`, Xcode 26.6 / Swift 6.3.3, iPhone 17 Pro simulator iOS 26.4.1 | Current app compile/launch, Core/Subscription XCTest, 3 UI fixtures | PASS (remote only) | [Run 39105717171](https://github.com/andywangyzfh/OpenVision/actions/runs/39105717171), [xcresult and logs](https://github.com/andywangyzfh/OpenVision/actions/runs/39105717171/artifacts/12128452712); 17 + 7 + 3 test cases, plus all 120/42/17 portable checks. |
 | Initial follow-up | `b6a3809`, local Xcode 27.1 and remote CI | Production platform / startup / UI | FAIL | Initial unsigned Keychain entitlement failures and SDK startup crash; ineffective synthetic Home event in local UI. See validation record for fixes. |
 | Clean local regression | `c6e0c1b`, Xcode 27.1 / iOS Simulator 27.1 | Full local packages/platform/UI and portable checks | PASS (before privacy hardening) | 17 + 7 + 29 + 7 XCTest; all 120/42/53/28/13/61 portable checks. Remote run cancelled on newer commit. |
-| Final required local gate | `b49c1db73780c18befc67cb4f6db5c84596874e0`, macOS 26.6.2, Xcode 27.1, iPhone Duo OpenVision MVP / iOS 27.1 | All Gate 1 BUILD/A/S/review rows | **PASS, local software only** | 61 XCTest (17 Core + 8 Subscription + 29 platform + 7 UI), 0 failures/skips; portable 120/43/53/28/13/61. Clean-source build and complete execution; detailed per-ID mapping, warnings and artifact location in [validation-mvp.md](validation-mvp.md). |
-| Final remote CI | `b49c1db`, Xcode 26.6 | Independent CI | See Actions | [Run 39113878097](https://github.com/andywangyzfh/OpenVision/actions/runs/39113878097); does not replace local evidence. |
+| Historical local subset | `b49c1db73780c18befc67cb4f6db5c84596874e0`, macOS 26.6.2, Xcode 27.1, iPhone Duo OpenVision MVP / iOS 27.1 | All Gate 1 BUILD/A/S/review rows | **原集合PASS；扩展S0待补测** | 61 XCTest (17 Core + 8 Subscription + 29 platform + 7 UI), 0 failures/skips; portable 120/43/53/28/13/61. Clean-source build and complete execution; detailed per-ID mapping, warnings and artifact location in [validation-mvp.md](validation-mvp.md). |
+| Final remote CI | `b49c1db`, Xcode 26.6 | Independent CI | PASS (automated only) | [Run 39113878097](https://github.com/andywangyzfh/OpenVision/actions/runs/39113878097); does not replace local evidence. |
 | Physical iPhone + glasses/account | No installation or live account calls yet | Gate 2, all D/L criteria | NOT RUN | User requested phone-independent local testing first. Real audio/camera/subscription, signing, interruption and soak still required. |
 
 Suggested per-failure entry: `ID`, steps, expected/actual, reproducibility, environment, redacted artifact, linked GitHub issue, next action. Do not mark an entire group PASS if individual required checks were omitted.

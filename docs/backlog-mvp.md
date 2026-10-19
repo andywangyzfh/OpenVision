@@ -20,6 +20,8 @@ The fork's linked GitHub issues are the source of truth. This file indexes the s
 
 [Issue #13 — Investigate AVAudioSession main-thread warnings before device soak](https://github.com/andywangyzfh/OpenVision/issues/13): all local tests pass, but Xcode reports synchronous audio-session performance warnings. Measure responsiveness and HFP/photo transitions on the real device before AUDIO-02 / RES-01 / SOAK-01 sign-off; preserve cancellation and route ownership if scheduling changes are required. This is separate from adding new features.
 
+新增独立Review阻塞项：[凭据删除失败安全处理 #14](https://github.com/andywangyzfh/OpenVision/issues/14)，以及[完整授权协调器/身份传输边界补测 #15](https://github.com/andywangyzfh/OpenVision/issues/15)。它们属于MVP质量收口，不是可自动豁免的后续功能。完整状态见 [测试清单](test-plan-mvp.md)。
+
 ## Deferred issues
 
 ### BACKLOG-01 — Harden ChatGPT subscription eligibility and live-account onboarding
