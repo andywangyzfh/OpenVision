@@ -176,6 +176,14 @@ struct MVPContentView: View {
                 Section { Text(model.status).font(.caption) }
             }.navigationTitle(model.text("设置", "Settings"))
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(model.text("完成", "Done")) { model.showAccount = false } } }
+                .safeAreaInset(edge: .bottom) {
+                    Button(model.text("返回对话", "Back to conversation")) { model.showAccount = false }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("settings.close")
+                        .padding()
+                        .background(.regularMaterial)
+                }
         }
     }
 
