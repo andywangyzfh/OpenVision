@@ -121,7 +121,7 @@ final class ConversationViewModel: ObservableObject {
                 : text("已连接。可在 ChatGPT 设置核对本应用的用量与限额。", "Connected. Review this app's usage and limits in ChatGPT Settings.")
         } catch {
             guard accountActionGeneration == generation else { return }
-            status = failureMessage(error)
+            status = account.signOutNotice ?? failureMessage(error)
         }
     }
 
