@@ -1,6 +1,14 @@
 # Validation record / 实测记录
 
-2026-10-19 更新：**S0 本地软件门槛已获独立 Review APPROVE；产品整体仍 NOT ACCEPTED。** S1 真实账号/模型/额度、S2 iPhone/眼镜均未测。没有读取其他 App 的凭据，也没有进行真实模型或付费 API 调用。
+## 本轮真机准备进度（2026-10-19，尚未验收）
+
+独立CI [39221241977](https://github.com/andywangyzfh/OpenVision/actions/runs/39221241977) 已成功，源码头为2107e0d。真实 iPhone15ProMax / iOS27.0.1 (24A446) 已配对，Developer Mode已核验开启。Xcode Personal Team签名构建、正常系统权限codesign deep/strict校验、目标手机及Bundle配置匹配、实际安装均通过。免费开发配置到期2026-10-26，可由Xcode重新签名安装。
+
+**H01仅部分完成**：第一次启动返回iOS Security拒绝，系统要求本人显式信任开发配置；已请求用户在“设置→通用→VPN与设备管理”完成。没有绕过信任检查。设备上的Keychain/AppSupport探针、正式账号授权、模型、语音和眼镜仍未执行，不能把安装成功当产品可用。
+
+构建来源02e40d2（产品等价c5c375b），仅在临时工程选择本地签名团队。没有把Apple账号、UDID、序列号、证书私钥或token提交到仓库。脱敏本地报告位于task outputs/OpenVision-MVP-validation/device-20261019/。下方本地及历史结果仍按各自SHA/日期解释。
+
+2026-10-19 第一轮本地回归结论：**S0 本地软件门槛已获独立 Review APPROVE；产品整体仍 NOT ACCEPTED。** 当时S1/S2未执行；后续真机安装进度见顶部。没有读取其他 App 的凭据，也没有进行真实模型或付费 API 调用。
 
 ## 本轮固定源码与执行结果
 
