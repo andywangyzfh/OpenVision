@@ -44,6 +44,8 @@ targets:
         product: MWDATCore
       - package: MetaDAT
         product: MWDATCamera
+      - package: MetaDAT
+        product: MWDATInputs
   OpenVisionMVPTestHost:
     type: application
     platform: iOS
@@ -70,6 +72,11 @@ targets:
       - path: App/Account/ChatGPTAccountService.swift
       - path: App/Account/AccountCoordinatorDependencies.swift
       - path: App/Account/PlanAuthCallback.swift
+      - path: App/Account/ChatGPTPlanClient.swift
+      - path: App/ConversationViewModel.swift
+      - path: App/GlassesInputService.swift
+      - path: App/DATInputDriver.swift
+      - path: App/GlassesVoiceCoordinator.swift
     dependencies:
       - target: OpenVisionMVPTestHost
       - package: OpenVisionCore
@@ -78,6 +85,8 @@ targets:
         product: MWDATCore
       - package: MetaDAT
         product: MWDATCamera
+      - package: MetaDAT
+        product: MWDATInputs
     settings:
       base:
         GENERATE_INFOPLIST_FILE: true

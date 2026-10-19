@@ -12,7 +12,15 @@ final class ConversationViewModel: ObservableObject {
         }
     }
     @Published var useGlassesMicrophone = true
-    @Published var draft = ""
+    @Published var draft = "" { didSet { if draft != oldValue { revokePendingPhoto() } } }
+    struct PendingPhotoRequest: Identifiable {
+        let id: UUID
+        let question: String
+        let resumeConversation: Bool
+    }
+    @Published private(set) var pendingPhoto: PendingPhotoRequest?
+    var onConfirmedPhotoWillStart: (@MainActor () async throws -> Void)?
+    private var confirmingPhotoID: UUID?
     @Published var messages: [ChatLine] = []
     @Published var status = ""
     @Published var modelID = ""
@@ -33,6 +41,9 @@ final class ConversationViewModel: ObservableObject {
     private var activeForeground = true
     private let preview: Bool
     private var startGeneration = UUID()
+    /// Root captures this synchronously when accepting a gesture. App Stop and new turns
+    /// invalidate queued gestures even when physical-input standby remains armed.
+    var voiceActivationGeneration: UUID { startGeneration }
     private var accountActionGeneration = UUID()
     private var accountObserver: AnyCancellable?
     #if DEBUG
@@ -58,12 +69,12 @@ final class ConversationViewModel: ObservableObject {
         #endif
     }
 
-    init(account: ChatGPTAccountService, preview: Bool = false, sdkAvailable: Bool = false, speechService: SpeechService? = nil) {
+    init(account: ChatGPTAccountService, preview: Bool = false, sdkAvailable: Bool = false, speechService: SpeechService? = nil, glassesService: GlassesPhotoService? = nil) {
         self.account = account
         self.preview = preview
         client = ChatGPTPlanClient(account: account)
         speech = speechService ?? SpeechService()
-        glasses = GlassesPhotoService(monitoring: !preview, sdkAvailable: sdkAvailable)
+        glasses = glassesService ?? GlassesPhotoService(monitoring: !preview, sdkAvailable: sdkAvailable)
         language = ConversationLanguage(rawValue: UserDefaults.standard.string(forKey: "mvp.language") ?? "") ?? .chinese
         speech.onUtterance = { [weak self] in self?.submit($0) }
         speech.onSpeechFinished = { [weak self] in
@@ -179,8 +190,11 @@ final class ConversationViewModel: ObservableObject {
         status = account.signOutNotice ?? text("本机登录已清除。", "Local sign-in removed.")
     }
 
-    func toggleConversation() async {
+    func toggleConversation(expectedGeneration: UUID? = nil, ifAllowed: @escaping @MainActor () -> Bool = { true }) async {
+        guard expectedGeneration == nil || expectedGeneration == startGeneration, ifAllowed() else { return }
+        revokePendingPhoto() // A voice activation gesture can never confirm an old photo.
         if conversationActive { stop(); return }
+        guard activeForeground else { return }
         guard !authorizingSpeech else { return }
         guard ready, !modelID.isEmpty else { showAccount = true; return }
         guard !preview else { status = text("这是本地界面测试模式，不连接麦克风。", "Local UI test mode does not open the microphone."); return }
@@ -189,6 +203,7 @@ final class ConversationViewModel: ObservableObject {
         let authorized = await speech.authorize()
         guard startGeneration == generation else { return }
         authorizingSpeech = false
+        guard ifAllowed() else { return }
         guard authorized else {
             status = text("需要麦克风和语音识别权限，请在 iPhone 设置中允许。", "Allow microphone and speech recognition in iPhone Settings.")
             return
@@ -196,6 +211,14 @@ final class ConversationViewModel: ObservableObject {
         guard activeForeground else { return }
         conversationActive = true
         beginListening()
+    }
+
+    func handleGlassesVoiceToggle(expectedGeneration: UUID? = nil, ifAllowed: @escaping @MainActor () -> Bool = { true }) async {
+        guard expectedGeneration == nil || expectedGeneration == startGeneration, ifAllowed() else { return }
+        revokePendingPhoto()
+        if busy || authorizingSpeech || conversationActive || speech.isListening || stage == .speaking { stop() }
+        else if showAccount { status = text("请先关闭设置，再双击开始语音对话。", "Close Settings before double-tapping to start a voice conversation.") }
+        else { await toggleConversation(expectedGeneration: expectedGeneration, ifAllowed: ifAllowed) }
     }
 
     private func beginListening() {
@@ -219,20 +242,70 @@ final class ConversationViewModel: ObservableObject {
         let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard photo || !value.isEmpty else { return }
         draft = ""
-        if photo { run(question: value.isEmpty ? language.defaultPhotoQuestion : value, photo: true) }
+        if photo { requestPhoto(question: value.isEmpty ? language.defaultPhotoQuestion : value) }
         else { submit(value) }
     }
 
     func submit(_ text: String) {
+        revokePendingPhoto()
         switch CommandParser().parse(text) {
         case .empty: if conversationActive { beginListening() }
         case .stop, .cancel: stop()
-        case .photo(let question): run(question: question.isEmpty ? language.defaultPhotoQuestion : question, photo: true)
-        case .conversation(let question): run(question: question, photo: false)
+        case .photo(let question): requestPhoto(question: question.isEmpty ? language.defaultPhotoQuestion : question)
+        case .conversation(let question): run(question: question)
         }
     }
 
-    private func run(question: String, photo: Bool) {
+    private func revokePendingPhoto() {
+        guard pendingPhoto != nil else { return }
+        pendingPhoto = nil
+        confirmingPhotoID = nil
+        glasses.revokeUnconsumedPhotoIntents()
+        status = text("拍照请求已撤销，相机尚未开启。", "Photo request cancelled. The camera has not started.")
+    }
+
+    private func requestPhoto(question: String) {
+        guard activeForeground, canSend else { return }
+        guard !glasses.cameraActive else {
+            stop()
+            status = text("相机仍在关闭中。确认关闭后才能发起新拍照。", "The camera is still closing. Wait until it is off before requesting another photo.")
+            return
+        }
+        let resumeConversation = conversationActive
+        stop()
+        pendingPhoto = .init(id: UUID(), question: question, resumeConversation: resumeConversation)
+        status = text("尚未开启相机。请在 App 中确认本次拍摄一张照片。", "The camera has not started. Confirm this one photo in the App.")
+    }
+
+    func cancelPhoto(requestID: UUID) {
+        guard pendingPhoto?.id == requestID else { return }
+        revokePendingPhoto()
+        status = text("已取消拍照，相机尚未开启。", "Photo cancelled. The camera has not started.")
+    }
+
+    func confirmPhoto(requestID: UUID) {
+        guard let request = pendingPhoto, request.id == requestID, activeForeground, canSend, confirmingPhotoID == nil else { return }
+        confirmingPhotoID = requestID
+        Task { [weak self] in
+            guard let self else { return }
+            defer { if confirmingPhotoID == requestID { confirmingPhotoID = nil } }
+            do {
+                try await onConfirmedPhotoWillStart?()
+                guard pendingPhoto?.id == requestID, activeForeground, canSend else { return }
+                let intent = try glasses.authorizeSinglePhoto(requestID: requestID)
+                pendingPhoto = nil
+                conversationActive = request.resumeConversation
+                run(question: request.question, photoIntent: intent)
+            } catch {
+                guard pendingPhoto?.id == requestID else { return }
+                revokePendingPhoto()
+                status = text("未能准备本次拍照，相机尚未开启。请重试。", "This photo could not be prepared. The camera has not started. Retry explicitly.")
+            }
+        }
+    }
+
+    private func run(question: String, photoIntent: GlassesPhotoService.CaptureIntent? = nil) {
+        let photo = photoIntent != nil
         guard !photo || glasses.sdkAvailable || preview else {
             stop(); status = glassesSetupMessage; return
         }
@@ -255,7 +328,7 @@ final class ConversationViewModel: ObservableObject {
                 if photo {
                     // UI fixture deliberately cannot simulate a successful hardware photo.
                     if preview { throw GlassesPhotoService.PhotoFailure.noGlasses }
-                    jpeg = try await glasses.captureJPEG()
+                    jpeg = try await glasses.captureJPEG(intent: photoIntent)
                 } else { jpeg = nil }
                 try Task.checkCancellation()
                 guard lifecycle.isCurrent(id) else { return }
@@ -277,6 +350,7 @@ final class ConversationViewModel: ObservableObject {
                 try speech.speak(answer, language: language.responseLanguage(for: question))
             } catch {
                 guard lifecycle.isCurrent(id) else { return }
+                glasses.revokeUnconsumedPhotoIntents()
                 busy = false; lifecycle.stop(); stage = .idle
                 conversationActive = false
                 if (error as? GlassesPhotoService.PhotoFailure) == .sdkUnavailable {
@@ -320,6 +394,7 @@ final class ConversationViewModel: ObservableObject {
     }
 
     func stop() {
+        revokePendingPhoto()
         startGeneration = UUID(); authorizingSpeech = false
         conversationActive = false
         lifecycle.stop(); stage = .idle; busy = false
@@ -331,11 +406,16 @@ final class ConversationViewModel: ObservableObject {
     }
 
     func clear() { stop(); messages.removeAll(); history.removeAll(); status = "" }
-    func setForeground(_ active: Bool) {
+    func setForeground(_ active: Bool, cancelAccountAuthorization: Bool = true) {
         activeForeground = active
         if !active {
-            accountActionGeneration = UUID(); signingIn = false
-            stop(); account.cancelSignIn()
+            stop()
+            // Official account authorization can temporarily make the app inactive.
+            // Stop voice/photos immediately, but cancel account work only on background.
+            if cancelAccountAuthorization {
+                accountActionGeneration = UUID(); signingIn = false
+                account.cancelSignIn()
+            }
             status = text("已暂停。回到 App 后点击开始。", "Paused. Tap Start when you return.")
         }
     }

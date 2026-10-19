@@ -137,7 +137,9 @@ final class MVPFlowTests: XCTestCase {
         let app = launch()
         app.segmentedControls["conversation.language"].buttons["English"].tap()
         let input = app.textFields["conversation.input"].exists ? app.textFields["conversation.input"] : app.textViews["conversation.input"]
-        input.tap(); input.typeText("Hello")
+        input.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Software keyboard must appear before typing")
+        input.typeText("Hello")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "Software keyboard is required for this keyboard-geometry regression")
         let entered = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Hello"), object: input)
         XCTAssertEqual(XCTWaiter.wait(for: [entered], timeout: 5), .completed, "Actual input: \(String(describing: input.value))")
@@ -157,9 +159,64 @@ final class MVPFlowTests: XCTestCase {
     func testPhotoFailureNeverInventsScene() {
         let app = launch()
         app.buttons["conversation.photo"].tap()
+        XCTAssertTrue(app.buttons["photo.confirm"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["尚未开启相机"].exists)
+        app.buttons["photo.confirm"].tap()
         let status = app.staticTexts["conversation.status"]
         let failed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "未能取得新照片"), object: status)
         XCTAssertEqual(XCTWaiter.wait(for: [failed], timeout: 5), .completed)
         XCTAssertFalse(app.staticTexts["本地测试回答。没有调用模型。"].exists)
     }
+
+    @MainActor
+    func testPhotoRequestCanBeCancelledBeforeCameraStarts() {
+        let app = launch()
+        app.buttons["conversation.photo"].tap()
+        XCTAssertTrue(app.buttons["photo.cancel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["尚未开启相机"].exists)
+        app.buttons["photo.cancel"].tap()
+        let status = app.staticTexts["conversation.status"]
+        let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "相机尚未开启"), object: status)
+        XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 5), .completed)
+        XCTAssertTrue(app.staticTexts["相机关闭"].exists)
+        XCTAssertFalse(app.staticTexts["本地测试回答。没有调用模型。"].exists)
+    }
+    @MainActor
+    func testPhotoConfirmationStopLeavesCameraOff() {
+        let app = launch()
+        app.buttons["conversation.photo"].tap()
+        XCTAssertTrue(app.buttons["photo.stop"].waitForExistence(timeout: 5))
+        app.buttons["photo.stop"].tap()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["photo.confirm"])
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed)
+        XCTAssertTrue(app.staticTexts["相机关闭"].exists)
+        XCTAssertFalse(app.staticTexts["本地测试回答。没有调用模型。"].exists)
+    }
+
+    @MainActor
+    func testDismissingPhotoConfirmationCancelsWithoutStartingCamera() {
+        let app = launch()
+        app.buttons["conversation.photo"].tap()
+        let title = app.staticTexts["photo.confirmation.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        let before = XCTAttachment(screenshot: app.screenshot())
+        before.name = "Photo sheet before one dismissal drag"; before.lifetime = .keepAlways; add(before)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Photo sheet drag bounds"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        // A short semantic swipe on the title did not dismiss the native sheet.
+        // Start in the observed sheet top blank area and drag toward the actual window bottom once.
+        let start = title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: -16))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.97))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        let after = XCTAttachment(screenshot: app.screenshot())
+        after.name = "Photo sheet after one dismissal drag"; after.lifetime = .keepAlways; add(after)
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["photo.confirm"])
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed)
+        let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "相机尚未开启"), object: app.staticTexts["conversation.status"])
+        XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 5), .completed)
+        XCTAssertTrue(app.staticTexts["相机关闭"].exists)
+        XCTAssertFalse(app.staticTexts["本地测试回答。没有调用模型。"].exists)
+    }
+
 }

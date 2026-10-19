@@ -149,6 +149,7 @@ final class SpeechService: ObservableObject {
 
 @MainActor
 final class GlassesPhotoService: ObservableObject {
+    struct CaptureIntent { let id: UUID }
     enum PhotoFailure: Error { case sdkUnavailable, noGlasses, capture }
     let sdkAvailable: Bool
     var cameraActive = false
@@ -160,9 +161,17 @@ final class GlassesPhotoService: ObservableObject {
     var holdCapture = false
     var pendingCapture: CheckedContinuation<Data, Error>?
     var registrationURLs = 0
+    var mintedIntents = 0
+    var intentAuthorizationFailure: Error?
     init(monitoring: Bool, sdkAvailable: Bool = false) { self.sdkAvailable = sdkAvailable }
     func handleRegistrationURL(_ url: URL) async throws { registrationURLs += 1 }
-    func captureJPEG() async throws -> Data {
+    func authorizeSinglePhoto(requestID: UUID) throws -> CaptureIntent {
+        if let intentAuthorizationFailure { throw intentAuthorizationFailure }
+        mintedIntents += 1
+        return .init(id: requestID)
+    }
+    func revokeUnconsumedPhotoIntents() {}
+    func captureJPEG(intent: CaptureIntent?) async throws -> Data {
         captures += 1; cameraActive = true
         defer { cameraActive = false }
         if failCapture { throw PhotoFailure.capture }

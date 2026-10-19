@@ -46,6 +46,7 @@ private func setup(signedIn: Bool = true, sdkAvailable: Bool = true) async throw
 @MainActor
 private func send(_ model: ConversationViewModel, _ value: String, photo: Bool = false) {
     model.draft = value; model.sendDraft(photo: photo)
+    if photo, let request = model.pendingPhoto { model.confirmPhoto(requestID: request.id) }
 }
 
 @MainActor
@@ -63,6 +64,8 @@ private func additionalScenarios() -> [(String, @MainActor () async throws -> Vo
             try expect(!vm.glasses.sdkAvailable && vm.canSend, "SDK failure disabled usable account/text state")
             await vm.toggleConversation()
             vm.speech.emitUtterance("看看这个")
+            if let pending = vm.pendingPhoto { vm.confirmPhoto(requestID: pending.id) }
+            await drain()
             try expect(vm.status.contains("Meta SDK 初始化失败") && !vm.busy && !vm.conversationActive && !vm.speech.isListening, "SDK failure did not explain disabled photo or left voice session wedged")
             try expect(world.requests.isEmpty && vm.glasses.captures == 0 && vm.messages.isEmpty, "Unavailable SDK photo reached a service")
             await vm.handleRegistrationURL(URL(string: "openvisionmvp://registration?test=1")!)
@@ -201,6 +204,8 @@ private func additionalScenarios() -> [(String, @MainActor () async throws -> Vo
             vm.glasses.photos = [fresh]
             await vm.toggleConversation()
             vm.speech.emitUtterance(utterance)
+            try expect(vm.pendingPhoto != nil && vm.glasses.captures == 0 && world.requests.isEmpty, "Photo intent opened camera before confirmation")
+            if let pending = vm.pendingPhoto { vm.confirmPhoto(requestID: pending.id) }
             try await finishTurn(vm)
             try expect(vm.glasses.captures == 1 && world.requests.count == 1, "Explicit voice photo did not capture/send once")
             try expect(world.requests[0].turns.compactMap(\.imageJPEG) == [fresh], "Explicit voice photo did not carry current photo")
@@ -365,6 +370,239 @@ private func statusScenarios() -> [(String, @MainActor () async throws -> Void)]
     return scenarios
 }
 
+@MainActor
+private func photoSafetyScenarios() -> [(String, @MainActor () async throws -> Void)] {
+    var result: [(String, @MainActor () async throws -> Void)] = []
+    for action in ["cancel", "stop", "background", "clear", "language", "logout", "voice", "draft", "new-text", "new-photo"] {
+        result.append(("photo safety: stale confirmation rejected after " + action, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.draft = "本次照片问题"; vm.sendDraft(photo: true)
+            guard let pending = vm.pendingPhoto else { throw FlowFailure("Photo confirmation missing") }
+            try expect(vm.glasses.captures == 0 && vm.glasses.mintedIntents == 0 && world.requests.isEmpty, "Request opened camera before confirmation")
+            switch action {
+            case "cancel": vm.cancelPhoto(requestID: pending.id)
+            case "stop": vm.stop()
+            case "background": vm.setForeground(false)
+            case "clear": vm.clear()
+            case "language": vm.language = .english
+            case "logout": await vm.signOut()
+            case "voice": await vm.handleGlassesVoiceToggle()
+            case "draft": vm.draft = "新的草稿"
+            case "new-text": world.holdResponses = true; vm.submit("这是新的普通文字问题")
+            default: vm.submit("拍张照片告诉我这是什么")
+            }
+            await drain()
+            let status = vm.status
+            vm.confirmPhoto(requestID: pending.id); await drain()
+            try expect(vm.glasses.captures == 0 && vm.glasses.mintedIntents == 0 && vm.status == status, "Old confirmation opened camera or changed newer status")
+            if action == "new-photo" { try expect(vm.pendingPhoto?.id != nil && vm.pendingPhoto?.id != pending.id, "Old confirmation removed new pending request") }
+            if action == "new-text" { world.resolveResponses(); try await finishTurn(vm) }
+        }))
+    }
+    for utterance in ["看看这个", "看看这个，先别拍照", "look at this sentence", "What do you see?", "Take a photo and tell me what this is"] {
+        result.append(("photo safety: speech request is confirmation-only " + utterance, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            await vm.toggleConversation(); vm.speech.emitUtterance(utterance)
+            await drain()
+            try expect(vm.pendingPhoto != nil && vm.status.contains("尚未开启相机"), "Photo-like speech did not enter explicit confirmation")
+            try expect(vm.glasses.captures == 0 && vm.glasses.mintedIntents == 0 && world.requests.isEmpty && !vm.glasses.cameraActive, "Speech opened camera before a separate App action")
+            await vm.handleGlassesVoiceToggle()
+            try expect(vm.pendingPhoto == nil && vm.speech.isListening && vm.glasses.captures == 0, "Voice activation confirmed a photo")
+        }))
+    }
+    result.append(("photo safety: valid confirmation waits for inputs teardown and is one shot", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        vm.glasses.photos = [Data("new-confirmed-photo".utf8)]
+        var preparation: CheckedContinuation<Void, Error>?
+        var hooks = 0
+        vm.onConfirmedPhotoWillStart = { hooks += 1; try await withCheckedThrowingContinuation { preparation = $0 } }
+        vm.draft = "请描述本张照片"; vm.sendDraft(photo: true)
+        guard let request = vm.pendingPhoto else { throw FlowFailure("Pending request missing") }
+        vm.confirmPhoto(requestID: request.id); vm.confirmPhoto(requestID: request.id)
+        try await eventually("inputs teardown awaited") { preparation != nil }
+        try expect(hooks == 1 && vm.glasses.mintedIntents == 0 && vm.glasses.captures == 0, "Confirmation started camera before inputs stopped")
+        preparation?.resume(); preparation = nil
+        try await finishTurn(vm)
+        vm.confirmPhoto(requestID: request.id); await drain()
+        try expect(vm.glasses.mintedIntents == 1 && vm.glasses.captures == 1 && world.requests.count == 1, "Confirmation replay captured more than one image")
+        try expect(world.requests[0].turns.compactMap(\.imageJPEG) == [Data("new-confirmed-photo".utf8)], "Confirmed photo did not reach the model")
+    }))
+    result.append(("photo safety: cancellation during inputs teardown never mints an intent", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        var preparation: CheckedContinuation<Void, Error>?
+        vm.onConfirmedPhotoWillStart = { try await withCheckedThrowingContinuation { preparation = $0 } }
+        vm.submit("看看这个")
+        guard let request = vm.pendingPhoto else { throw FlowFailure("Pending request missing") }
+        vm.confirmPhoto(requestID: request.id)
+        try await eventually("preparation pending") { preparation != nil }
+        await vm.handleGlassesVoiceToggle()
+        preparation?.resume(); preparation = nil; await drain()
+        try expect(vm.pendingPhoto == nil && vm.speech.isListening && vm.glasses.mintedIntents == 0 && vm.glasses.captures == 0 && world.requests.isEmpty, "Late inputs teardown opened camera after voice activation")
+    }))
+    result.append(("photo safety: failed inputs teardown never mints an intent", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.onConfirmedPhotoWillStart = { throw FlowFailure("Inputs teardown not confirmed") }
+        vm.submit("看看这个")
+        guard let request = vm.pendingPhoto else { throw FlowFailure("Pending request missing") }
+        vm.confirmPhoto(requestID: request.id); await drain()
+        try expect(vm.pendingPhoto == nil && vm.glasses.mintedIntents == 0 && vm.glasses.captures == 0 && vm.status.contains("相机尚未开启"), "Failed teardown did not fail closed")
+    }))
+    result.append(("photo safety: intent authorization failure leaves explicit retry guidance", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        vm.glasses.intentAuthorizationFailure = FlowFailure("Previous capture still owns teardown")
+        vm.submit("看看这个")
+        guard let request = vm.pendingPhoto else { throw FlowFailure("Pending request missing") }
+        vm.confirmPhoto(requestID: request.id); await drain()
+        try expect(vm.pendingPhoto == nil && !vm.busy && vm.status.contains("未能准备本次拍照") && vm.glasses.mintedIntents == 0 && vm.glasses.captures == 0 && world.requests.isEmpty, "Intent mint failure silently dismissed confirmation or opened camera")
+        vm.glasses.intentAuthorizationFailure = nil
+        vm.glasses.photos = [Data("explicit-retry-photo".utf8)]
+        vm.confirmPhoto(requestID: request.id); await drain()
+        try expect(vm.glasses.captures == 0, "Failed request ID was reused without a new request")
+        vm.submit("看看这个")
+        guard let retry = vm.pendingPhoto else { throw FlowFailure("Retry confirmation missing") }
+        vm.confirmPhoto(requestID: retry.id)
+        try await finishTurn(vm)
+        try expect(vm.glasses.captures == 1 && world.requests.count == 1, "Explicit retry failed after intent authorization recovered")
+    }))
+    result.append(("photo safety: voice toggle stops a busy typed turn without camera", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        world.holdResponses = true; vm.submit("请回答这个普通问题")
+        try await eventually("model pending") { world.pendingResponses.count == 1 }
+        vm.showAccount = true
+        vm.modelID = "" // Busy work must still stop even if a model is no longer selected.
+        await vm.handleGlassesVoiceToggle(); world.resolveResponses(); await drain()
+        try expect(!vm.busy && vm.speech.spoken.isEmpty && vm.glasses.captures == 0 && vm.pendingPhoto == nil, "Voice toggle failed to stop typed work safely")
+    }))
+    for missing in ["account", "model"] {
+        result.append(("photo safety: unready voice gesture never requests microphone " + missing, {
+            let (vm, world) = try await setup(signedIn: false); defer { vm.stop() }
+            if missing == "model" {
+                world.catalog = []; vm.account.restoreSignedIn()
+                try await eventually("empty model catalog") { world.modelLoads == 1 }
+            }
+            await vm.handleGlassesVoiceToggle()
+            try expect(vm.showAccount && vm.speech.authorizationRequests == 0 && vm.speech.listening.isEmpty && vm.glasses.captures == 0 && vm.glasses.mintedIntents == 0, "Unready gesture opened microphone or camera")
+        }))
+    }
+    result.append(("photo safety: idle gesture in Settings never requests microphone", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.showAccount = true
+        await vm.handleGlassesVoiceToggle()
+        try expect(vm.speech.authorizationRequests == 0 && vm.speech.listening.isEmpty && vm.glasses.captures == 0 && vm.status.contains("关闭设置"), "Settings gesture opened microphone or camera")
+    }))
+    result.append(("photo safety: background gesture never requests microphone", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.setForeground(false)
+        await vm.handleGlassesVoiceToggle()
+        try expect(vm.speech.authorizationRequests == 0 && vm.speech.listening.isEmpty && vm.glasses.captures == 0, "Background gesture opened microphone or camera")
+    }))
+    result.append(("photo safety: invalid gesture permit cannot cancel a current photo request", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.submit("看看这个")
+        let requestID = vm.pendingPhoto?.id
+        await vm.handleGlassesVoiceToggle(ifAllowed: { false })
+        try expect(requestID != nil && vm.pendingPhoto?.id == requestID && vm.speech.authorizationRequests == 0 && vm.speech.listening.isEmpty, "Stale gesture changed the current confirmation or opened microphone")
+    }))
+    result.append(("photo safety: revoked gesture permit after permission await never starts listening", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.speech.holdAuthorization = true
+        var permitted = true
+        let activation = Task { await vm.handleGlassesVoiceToggle(ifAllowed: { permitted }) }
+        try await eventually("gesture permission awaiting") { vm.speech.pendingAuthorization != nil }
+        permitted = false
+        vm.speech.resolveAuthorization(true); await activation.value
+        try expect(!vm.authorizingSpeech && !vm.conversationActive && vm.speech.listening.isEmpty && vm.glasses.captures == 0, "Revoked permit started microphone after permission returned")
+    }))
+    result.append(("photo safety: direct conversation entry rejects an invalid permit without side effects", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.submit("看看这个")
+        let requestID = vm.pendingPhoto?.id
+        await vm.toggleConversation(ifAllowed: { false })
+        try expect(vm.pendingPhoto?.id == requestID && vm.speech.authorizationRequests == 0 && vm.speech.listening.isEmpty, "Conversation entry ignored permit before revoking photo or authorizing")
+    }))
+    result.append(("photo safety: accepted gesture invalidated by App Stop cannot restart microphone", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        let acceptedGeneration = vm.voiceActivationGeneration
+        vm.stop()
+        await vm.handleGlassesVoiceToggle(expectedGeneration: acceptedGeneration)
+        try expect(vm.speech.authorizationRequests == 0 && vm.speech.listening.isEmpty && !vm.conversationActive, "Queued gesture survived App Stop")
+    }))
+    result.append(("photo safety: accepted old gesture cannot cancel a newer photo or typed turn", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        let acceptedGeneration = vm.voiceActivationGeneration
+        vm.submit("看看这个")
+        let requestID = vm.pendingPhoto?.id
+        await vm.handleGlassesVoiceToggle(expectedGeneration: acceptedGeneration)
+        try expect(requestID != nil && vm.pendingPhoto?.id == requestID && vm.speech.authorizationRequests == 0, "Queued gesture cancelled a newer photo")
+        world.holdResponses = true; vm.submit("这是新的文字问题")
+        try await eventually("new typed turn awaiting") { world.pendingResponses.count == 1 }
+        await vm.handleGlassesVoiceToggle(expectedGeneration: acceptedGeneration)
+        try expect(vm.busy && vm.speech.authorizationRequests == 0, "Old gesture stopped a newer turn")
+        vm.stop(); world.resolveResponses(); await drain()
+    }))
+    result.append(("photo safety: current gesture generation completes authorization normally", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        let acceptedGeneration = vm.voiceActivationGeneration
+        await vm.handleGlassesVoiceToggle(expectedGeneration: acceptedGeneration)
+        try expect(vm.speech.authorizationRequests == 1 && vm.speech.isListening && vm.conversationActive, "Own authorization generation was incorrectly compared with the old accepted generation")
+    }))
+    result.append(("photo safety: retained active camera does not claim a new request has not started", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        vm.glasses.cameraActive = true
+        vm.submit("看看这个")
+        try expect(vm.pendingPhoto == nil && vm.glasses.mintedIntents == 0 && vm.status.contains("相机仍在关闭"), "Unconfirmed cleanup was described as camera not started")
+    }))
+    return result
+}
+
+@MainActor
+private func authorizationLifecycleScenarios() -> [(String, @MainActor () async throws -> Void)] {
+    [
+        ("lifecycle: inactive account sheet preserves sign-in and completes after active", {
+            let (vm, world) = try await setup(signedIn: false); defer { vm.stop() }
+            vm.account.holdSignIn = true
+            let signIn = Task { await vm.connectAccount() }
+            try await eventually("account sheet waiting") { vm.account.pendingSignIns.count == 1 }
+            vm.setForeground(false, cancelAccountAuthorization: false)
+            try expect(vm.signingIn && vm.account.cancelledSignIns == 0 && !vm.account.isSignedIn, "Inactive authorization sheet cancelled a legitimate sign-in")
+            vm.setForeground(true)
+            vm.account.finishSignIn(at: 0); await signIn.value
+            try await eventually("account sheet completed") { vm.canSend }
+            try expect(vm.account.isSignedIn && !vm.signingIn && vm.account.cancelledSignIns == 0 && world.modelLoads == 1 && vm.speech.authorizationRequests == 0, "Sign-in did not complete normally after temporary inactivity")
+        }),
+        ("lifecycle: true background cancels inactive account sheet and rejects late completion", {
+            let (vm, world) = try await setup(signedIn: false); defer { vm.stop() }
+            vm.account.holdSignIn = true
+            let signIn = Task { await vm.connectAccount() }
+            try await eventually("account sheet waiting") { vm.account.pendingSignIns.count == 1 }
+            vm.setForeground(false, cancelAccountAuthorization: false)
+            vm.setForeground(false, cancelAccountAuthorization: true)
+            try expect(!vm.signingIn && vm.account.cancelledSignIns == 1, "Background failed to cancel account authorization")
+            vm.setForeground(true)
+            vm.account.finishSignIn(at: 0); await signIn.value; await drain()
+            try expect(!vm.account.isSignedIn && !vm.ready && world.modelLoads == 0 && vm.models.isEmpty && vm.speech.authorizationRequests == 0, "Late cancelled credentials reactivated the account")
+        }),
+        ("lifecycle: inactive still revokes pending speech permission without cancelling account", {
+            let (vm, _) = try await setup(); defer { vm.stop() }
+            vm.speech.holdAuthorization = true
+            let activation = Task { await vm.toggleConversation() }
+            try await eventually("microphone permission waiting") { vm.speech.pendingAuthorization != nil }
+            vm.setForeground(false, cancelAccountAuthorization: false)
+            vm.speech.resolveAuthorization(true); await activation.value
+            try expect(!vm.authorizingSpeech && !vm.conversationActive && vm.speech.listening.isEmpty && vm.account.cancelledSignIns == 0, "Inactive account preservation also preserved microphone activation")
+        }),
+        ("lifecycle: inactive still revokes photo confirmation without cancelling account", {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.submit("看看这个")
+            guard let request = vm.pendingPhoto else { throw FlowFailure("Photo confirmation missing") }
+            vm.setForeground(false, cancelAccountAuthorization: false)
+            vm.setForeground(true)
+            vm.confirmPhoto(requestID: request.id); await drain()
+            try expect(vm.pendingPhoto == nil && vm.glasses.mintedIntents == 0 && vm.glasses.captures == 0 && world.requests.isEmpty && vm.account.cancelledSignIns == 0, "Inactive preserved a camera authorization while preserving account sheet")
+        })
+    ]
+}
+
 @main
 struct FlowChecks {
     @MainActor
@@ -483,7 +721,7 @@ struct FlowChecks {
                 let (vm, world) = try await setup(); defer { vm.stop() }
                 vm.glasses.failCapture = true
                 send(vm, "这是什么", photo: true)
-                try await eventually("failed capture settled") { !vm.busy }
+                try await eventually("failed capture settled") { vm.glasses.captures == 1 && !vm.busy }
                 try expect(vm.glasses.captures == 1 && world.requests.isEmpty, "Failed capture reached model")
                 try expect(vm.messages.allSatisfy(\.user) && vm.speech.spoken.isEmpty, "Failed capture invented an answer")
                 try expect(vm.status.contains("没有发送旧图"), "Fresh-photo failure message missing")
@@ -596,7 +834,7 @@ struct FlowChecks {
             })
         ]
         do {
-            let allScenarios = scenarios + additionalScenarios() + statusScenarios()
+            let allScenarios = scenarios + additionalScenarios() + statusScenarios() + photoSafetyScenarios() + authorizationLifecycleScenarios()
             let filter = ProcessInfo.processInfo.environment["OPENVISION_FLOW_FILTER"]
             let selected = filter.map { needle in allScenarios.filter { $0.0.contains(needle) } } ?? allScenarios
             try expect(!selected.isEmpty, "No scenarios matched the requested filter")

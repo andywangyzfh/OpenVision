@@ -6,6 +6,11 @@ import UIKit
 /// No phone-camera fallback, recordings, continuous preview or persistent image cache.
 @MainActor
 final class GlassesPhotoService: ObservableObject {
+    struct CaptureIntent: Sendable, Equatable {
+        fileprivate let requestID: UUID
+        fileprivate let nonce: UUID
+        fileprivate let epoch: Int
+    }
     struct Timing {
         var sessionStart: TimeInterval = 15
         var streamStart: TimeInterval = 15
@@ -27,6 +32,15 @@ final class GlassesPhotoService: ObservableObject {
     private var operationGeneration = 0
     private var cleanupTask: Task<Bool, Never>?
     private var failed = false
+    private var permittedIntent: CaptureIntent?
+    private var intentEpoch = 0
+    private var activeIntentEpoch: Int?
+
+    /// UI activity ends before SDK teardown can finish. Independent DAT sessions must
+    /// wait for the actual capture owner and every retained hardware handle to release.
+    var canStartIndependentSession: Bool {
+        !captureInFlight && !driver.hasSession && cleanupTask == nil && !cameraActive
+    }
 
     init(monitoring: Bool = true, sdkAvailable: Bool = false, driver: (any DATCameraDriver)? = nil, timing: Timing = Timing()) {
         let selected = driver ?? WearablesCameraDriver(sdkAvailable: sdkAvailable, monitoring: monitoring)
@@ -49,7 +63,19 @@ final class GlassesPhotoService: ObservableObject {
     func authorizeCamera() async throws -> Bool { try requireSDK(); return try await driver.authorizeCamera() }
     func handleRegistrationURL(_ url: URL) async throws { try requireSDK(); try await driver.handleRegistrationURL(url) }
 
-    func captureJPEG() async throws -> Data {
+    /// Called only after the App's positive confirmation. Minting touches no SDK or permission.
+    func authorizeSinglePhoto(requestID: UUID) throws -> CaptureIntent {
+        guard !captureInFlight else { throw PhotoFailure.busy }
+        let intent = CaptureIntent(requestID: requestID, nonce: UUID(), epoch: intentEpoch)
+        permittedIntent = intent
+        return intent
+    }
+
+    func revokeUnconsumedPhotoIntents() { permittedIntent = nil }
+
+    func captureJPEG(intent: CaptureIntent?) async throws -> Data {
+        guard let intent, permittedIntent == intent, intent.epoch == intentEpoch else { throw PhotoFailure.invalidIntent }
+        permittedIntent = nil // Consume before the first await; replay cannot open another session.
         try requireSDK()
         // Keep ownership through permission awaits and teardown. Stop invalidates this operation,
         // but a second capture cannot overtake it and then be closed by its late error handler.
@@ -57,6 +83,7 @@ final class GlassesPhotoService: ObservableObject {
         captureInFlight = true
         defer { captureInFlight = false }
         let generation = operationGeneration
+        activeIntentEpoch = intent.epoch
         if driver.hasSession || cleanupTask != nil || cameraActive {
             guard await close() else { throw PhotoFailure.teardown }
         }
@@ -69,8 +96,10 @@ final class GlassesPhotoService: ObservableObject {
             let permission = try await driver.cameraPermissionGranted()
             try checkActiveCapture(id, generation: generation)
             guard permission else { throw PhotoFailure.permission }
+            try checkActiveCapture(id, generation: generation)
             try driver.createAndStartSession()
             try await waitUntil(seconds: timing.sessionStart, id: id, generation: generation) { self.driver.sessionStarted }
+            try checkActiveCapture(id, generation: generation)
             try driver.attachCamera { [weak self] event in
                 guard let self, captureID == id else { return }
                 switch event {
@@ -81,8 +110,10 @@ final class GlassesPhotoService: ObservableObject {
                 }
             }
             cameraActive = true
+            try checkActiveCapture(id, generation: generation)
             driver.startStream()
             try await waitUntil(seconds: timing.streamStart, id: id, generation: generation) { self.streaming }
+            try checkActiveCapture(id, generation: generation)
             guard driver.capturePhoto() else { throw PhotoFailure.capture }
             try await waitUntil(seconds: timing.photo, id: id, generation: generation) { self.photoData != nil }
             guard let data = photoData, let image = UIImage(data: data) else { throw PhotoFailure.capture }
@@ -107,6 +138,7 @@ final class GlassesPhotoService: ObservableObject {
 
     func stop() {
         operationGeneration += 1
+        intentEpoch += 1; permittedIntent = nil
         guard sdkAvailable else { return }
         // Unstructured cleanup deliberately does not inherit the canceled capture's lifetime.
         // Retain hardware references until SDK teardown is confirmed.
@@ -144,7 +176,7 @@ final class GlassesPhotoService: ObservableObject {
 
     private func checkActiveCapture(_ id: UUID, generation: Int) throws {
         try Task.checkCancellation()
-        guard generation == operationGeneration, captureID == id else { throw CancellationError() }
+        guard generation == operationGeneration, captureID == id, activeIntentEpoch == intentEpoch else { throw PhotoFailure.intentRevoked }
     }
 
     private func waitUntil(seconds: TimeInterval, id: UUID, generation: Int, _ condition: () -> Bool) async throws {
@@ -159,5 +191,5 @@ final class GlassesPhotoService: ObservableObject {
         }
     }
 
-    enum PhotoFailure: Error, Equatable { case sdkUnavailable, busy, noGlasses, permission, capture, teardown }
+    enum PhotoFailure: Error, Equatable { case invalidIntent, intentRevoked, sdkUnavailable, busy, noGlasses, permission, capture, teardown }
 }

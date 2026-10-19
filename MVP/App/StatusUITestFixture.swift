@@ -4,6 +4,17 @@ import OpenVisionCore
 import SubscriptionCore
 import SwiftUI
 
+private struct QuestionFocusObserverKey: EnvironmentKey {
+    static let defaultValue: (@MainActor @Sendable (Bool) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var questionFocusObserver: (@MainActor @Sendable (Bool) -> Void)? {
+        get { self[QuestionFocusObserverKey.self] }
+        set { self[QuestionFocusObserverKey.self] = newValue }
+    }
+}
+
 /// Explicit local-only launch mode. No Apple microphone/synthesizer, SDK, account or model I/O.
 /// Completion is injected at the SpeechDriver boundary, never into VM state or its callbacks.
 @MainActor
@@ -14,6 +25,9 @@ final class StatusUITestFixture: ObservableObject, SpeechDriver {
     @Published private(set) var requests = 0
     @Published private(set) var playbacks = 0
     @Published private(set) var listens = 0
+    @Published private(set) var questionFocused = false
+    @Published private(set) var focusChanges = 0
+    @Published private(set) var lastFocusUptime: UInt64 = 0
     private var playbackIDs: [UUID] = []
     private var receiveRecognition: (@MainActor (SpeechRecognitionEvent) -> Void)?
     private var pendingAnswer: CheckedContinuation<String, Error>?
@@ -24,6 +38,12 @@ final class StatusUITestFixture: ObservableObject, SpeechDriver {
     init(arguments: [String]) {
         holdAnswer = arguments.contains("--mvp-status-hold-model")
         missingVoice = arguments.contains("--mvp-status-missing-voice")
+    }
+
+    func recordQuestionFocus(_ focused: Bool) {
+        questionFocused = focused
+        focusChanges += 1
+        lastFocusUptime = DispatchTime.now().uptimeNanoseconds
     }
 
     func modelEffect() -> ConversationViewModel.LocalModelEffect {
@@ -77,6 +97,7 @@ struct StatusUITestControls: View {
                 .accessibilityIdentifier("fixture.platform.banner")
             Text("stage=\(String(describing: model.stage));busy=\(model.busy);canSend=\(model.canSend);preview=\(model.debugPreview);requests=\(fixture.requests);playbacks=\(fixture.playbacks);listens=\(fixture.listens)")
                 .font(.caption2).accessibilityIdentifier("fixture.platform.state")
+                .accessibilityValue("focus=\(fixture.questionFocused);focusChanges=\(fixture.focusChanges);lastFocusUptime=\(fixture.lastFocusUptime)")
             HStack {
                 Button("Finish") { fixture.finishLatestPlayback() }.accessibilityIdentifier("fixture.platform.finish")
                 Button("Old") { fixture.finishPreviousPlayback() }.accessibilityIdentifier("fixture.platform.old-finish")

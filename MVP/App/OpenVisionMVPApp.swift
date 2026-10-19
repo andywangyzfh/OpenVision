@@ -5,9 +5,16 @@ import SwiftUI
 struct OpenVisionMVPApp: App {
     @StateObject private var account: ChatGPTAccountService
     @StateObject private var model: ConversationViewModel
+    @StateObject private var glassesInputs: GlassesInputService
+    @Environment(\.scenePhase) private var scenePhase
+    private let voiceCoordinator: GlassesVoiceCoordinator
     private let preflightStatus: String?
     #if DEBUG
     private let statusFixture: StatusUITestFixture?
+    private var focusObserver: (@MainActor @Sendable (Bool) -> Void)? {
+        guard let statusFixture else { return nil }
+        return { focused in statusFixture.recordQuestionFocus(focused) }
+    }
     #endif
 
     init() {
@@ -47,8 +54,11 @@ struct OpenVisionMVPApp: App {
         #else
         let model = ConversationViewModel(account: account, preview: preview, sdkAvailable: sdkAvailable)
         #endif
+        let glassesInputs = GlassesInputService(sdkAvailable: sdkAvailable)
+        voiceCoordinator = GlassesVoiceCoordinator(model: model, inputs: glassesInputs)
         _account = StateObject(wrappedValue: account)
         _model = StateObject(wrappedValue: model)
+        _glassesInputs = StateObject(wrappedValue: glassesInputs)
     }
 
     var body: some Scene {
@@ -58,6 +68,10 @@ struct OpenVisionMVPApp: App {
             } else {
                 VStack(spacing: 0) {
                     MVPContentView(model: model, account: account, glasses: model.glasses, speech: model.speech)
+                        .environmentObject(glassesInputs)
+                        #if DEBUG
+                        .environment(\.questionFocusObserver, focusObserver)
+                        #endif
                         .frame(minHeight: 0, maxHeight: .infinity)
                     #if DEBUG
                     if let statusFixture {
@@ -68,6 +82,9 @@ struct OpenVisionMVPApp: App {
                 }
                     .onOpenURL { url in
                         Task { await model.handleRegistrationURL(url) }
+                    }
+                    .onChange(of: scenePhase, initial: true) { _, phase in
+                        voiceCoordinator.setActive(phase == .active, isBackground: phase == .background)
                     }
             }
         }

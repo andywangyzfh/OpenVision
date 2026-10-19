@@ -7,8 +7,11 @@ struct MVPContentView: View {
     @ObservedObject var account: ChatGPTAccountService
     @ObservedObject var glasses: GlassesPhotoService
     @ObservedObject var speech: SpeechService
-    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var glassesInputs: GlassesInputService
     @FocusState private var questionFocused: Bool
+    #if DEBUG
+    @Environment(\.questionFocusObserver) private var questionFocusObserver
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -34,6 +37,10 @@ struct MVPContentView: View {
                         .foregroundStyle(glasses.cameraActive ? Color.orange : Color.secondary)
                         .accessibilityIdentifier("camera.status")
                 }.font(.caption)
+                if glassesInputs.isEnabled {
+                    Text(glassesInputs.statusText(language: model.language)).font(.caption2)
+                        .accessibilityIdentifier("inputs.main-status")
+                }
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 16) {
@@ -89,13 +96,29 @@ struct MVPContentView: View {
                     }
                 }
                 .sheet(isPresented: $model.showAccount) { settings }
+                .sheet(item: Binding(get: { model.pendingPhoto }, set: { request in
+                    if request == nil, let pending = model.pendingPhoto { model.cancelPhoto(requestID: pending.id) }
+                })) { request in
+                    VStack(spacing: 20) {
+                        Text(model.text("尚未开启相机", "The camera has not started")).font(.headline)
+                            .accessibilityIdentifier("photo.confirmation.title")
+                        Text(model.text("确认后将开启眼镜相机，仅拍摄本次一张照片用于回答。", "Confirm to start the glasses camera and take one photo for this answer."))
+                        Text(request.question).font(.callout)
+                        Button(model.text("确认拍一张", "Confirm one photo")) { model.confirmPhoto(requestID: request.id) }
+                            .buttonStyle(.borderedProminent).accessibilityIdentifier("photo.confirm")
+                        Button(model.text("取消拍照", "Cancel photo"), role: .cancel) { model.cancelPhoto(requestID: request.id) }
+                            .accessibilityIdentifier("photo.cancel")
+                        Button(model.text("停止", "Stop")) { model.stop() }
+                            .accessibilityIdentifier("photo.stop")
+                    }.padding().presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
+                }
                 .onChange(of: model.showAccount) { _, presented in
                     if presented { model.stop() }
                 }
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .background { model.setForeground(false) }
-                    else if phase == .active { model.setForeground(true) }
-                }
+                #if DEBUG
+                .onChange(of: questionFocused) { _, focused in questionFocusObserver?(focused) }
+                #endif
         }
     }
 
@@ -123,6 +146,7 @@ struct MVPContentView: View {
                     Link(model.text("管理订阅用量及应用连接", "Manage plan usage and app connections"), destination: URL(string: "https://chatgpt.com/#settings/Usage")!)
                     Text(model.text("请在授权与用量页核对套餐及已有 credits 的使用设置。不会自动切换到其他 API 后端。", "Review plan and available-credit usage in the authorization and usage pages. No automatic switch to another API backend.")).font(.caption)
                 }
+                GlassesInputSettingsView(service: glassesInputs, language: model.language)
                 Section(model.text("眼镜", "Glasses")) {
                     Button(model.text("连接／注册眼镜", "Connect / register glasses")) { setup { try await glasses.register() } }
                         .disabled(!glasses.sdkAvailable)
