@@ -46,9 +46,12 @@ final class MVPFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["glasses.setup.status"].label.contains("Glasses features are not configured"))
         app.buttons["settings.open"].tap()
         XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Authorize glasses camera"].isEnabled)
-        XCTAssertFalse(app.buttons["Connect / register glasses"].isEnabled)
-        XCTAssertFalse(app.buttons["Install / update developer component"].isEnabled)
+        guard let register = settingsButton("glasses.register", in: app) else { return }
+        XCTAssertFalse(register.isEnabled)
+        guard let developer = settingsButton("glasses.developer.install", in: app) else { return }
+        XCTAssertFalse(developer.isEnabled)
+        guard let authorize = settingsButton("glasses.camera.authorize", in: app) else { return }
+        XCTAssertFalse(authorize.isEnabled)
     }
 
     @MainActor
@@ -59,6 +62,29 @@ final class MVPFlowTests: XCTestCase {
         app.launchArguments += additionalArguments
         app.launch()
         return app
+    }
+
+    /// Form rows are lazy: scroll only until the row exists. Disabled SDK controls
+    /// intentionally need not be hittable, and this helper never taps or enables them.
+    @MainActor
+    private func settingsButton(_ identifier: String, in app: XCUIApplication,
+                                file: StaticString = #filePath, line: UInt = #line) -> XCUIElement? {
+        let target = app.buttons[identifier]
+        for attempt in 0...6 {
+            if target.waitForExistence(timeout: 1) { return target }
+            guard attempt < 6 else { break }
+            let surface: XCUIElement
+            if app.collectionViews.firstMatch.exists { surface = app.collectionViews.firstMatch }
+            else if app.tables.firstMatch.exists { surface = app.tables.firstMatch }
+            else if app.scrollViews.firstMatch.exists { surface = app.scrollViews.firstMatch }
+            else {
+                XCTFail("Settings has no scrollable Form while locating \(identifier)", file: file, line: line)
+                return nil
+            }
+            surface.swipeUp()
+        }
+        XCTFail("Settings button \(identifier) did not exist after at most 6 Form scrolls", file: file, line: line)
+        return nil
     }
     @MainActor
     func testLanguagePersistsAcrossAppTermination() {
@@ -84,7 +110,7 @@ final class MVPFlowTests: XCTestCase {
         let app = launch()
         app.buttons["settings.open"].tap()
         XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["授权眼镜相机"].exists)
+        guard settingsButton("glasses.camera.authorize", in: app) != nil else { return }
         app.buttons["完成"].tap()
         // Switching to a real system app exercises lifecycle transitions on runtimes
         // whose synthetic Home key does not leave the foreground (e.g. iPhone Duo).
@@ -119,8 +145,7 @@ final class MVPFlowTests: XCTestCase {
         XCTAssertFalse(app.buttons["conversation.photo"].isEnabled)
         app.buttons["settings.open"].tap()
         XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
-        let authorize = app.buttons["授权眼镜相机"].exists ? app.buttons["授权眼镜相机"] : app.buttons["Authorize glasses camera"]
-        XCTAssertTrue(authorize.exists)
+        guard let authorize = settingsButton("glasses.camera.authorize", in: app) else { return }
         XCTAssertEqual(authorize.isEnabled, !setupFailed)
     }
     @MainActor

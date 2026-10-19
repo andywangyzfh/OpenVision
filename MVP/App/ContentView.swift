@@ -150,13 +150,16 @@ struct MVPContentView: View {
                 Section(model.text("眼镜", "Glasses")) {
                     Button(model.text("连接／注册眼镜", "Connect / register glasses")) { setup { try await glasses.register() } }
                         .disabled(!glasses.sdkAvailable)
+                        .accessibilityIdentifier("glasses.register")
                     Button(model.text("安装／更新官方开发组件", "Install / update developer component")) { setup { try await glasses.installDeveloperComponent() } }
                         .disabled(!glasses.sdkAvailable)
+                        .accessibilityIdentifier("glasses.developer.install")
                     Button(model.text("授权眼镜相机", "Authorize glasses camera")) { setup {
                         let granted = try await glasses.authorizeCamera()
                         model.status = granted ? model.text("眼镜相机已授权。", "Glasses camera authorized.") : model.text("相机授权被拒绝，请在 Meta AI 中检查权限。", "Camera permission denied. Review permissions in Meta AI.")
                     } }
                     .disabled(!glasses.sdkAvailable)
+                    .accessibilityIdentifier("glasses.camera.authorize")
                     Text(glasses.sdkAvailable
                          ? model.text("这些操作会打开官方 Meta AI App。", "These actions open the official Meta AI app.")
                          : model.glassesSetupMessage).font(.caption)
