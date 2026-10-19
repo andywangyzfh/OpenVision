@@ -1,8 +1,8 @@
 # MVP 完整测试用例与真实状态
 
-**当前总体：尚未完成产品验收，不能宣称已安全连接 Andy 的订阅或眼镜可用。** 已有 61 个 XCTest 方法通过；其中相机/语音/账号/模型的很多效果为替身。真实官方登录、联网模型、实际语音和眼镜全链路均未测。独立 Review 还发现退出删除失败未覆盖，需先处理；“61/61”不是产品完成率。
+**当前总体：S0本地软件门槛已获独立Review APPROVE；产品尚未完成验收，不能宣称已连接Pro或眼镜可用。** 真实官方登录、联网模型、实际语音和眼镜全链路均未测。
 
-本清单对应生产源码 `b49c1db73780c18befc67cb4f6db5c84596874e0`，2026-10-18。此轮整理证据、静态审计与用例，没有复跑61项产品测试，也没有新增真实登录/推理执行；CSV中已测日期沿用原b49证据日期。后续源码变化必须记录新SHA、运行日期、环境和回归范围。历史日志及失败修复见 [实测记录](validation-mvp.md)，旧 Gate 1 只证明旧清单中的本地软件行为。
+本轮2026-10-19：`c5c375b8d4893c2d66db60a4c88231186f7cdac9` 干净源码整套83项XCTest通过（17/14/42/10）；仅追加一项迟到失败测试的 `02e40d2629ff98586f138dbcd02ca0c1b869fe4b` 平台43项通过，产品源码经归档哈希证明完全相同。两轮有重叠，不能相加；去重84个方法。便携120/43/59/28/39/61通过。详情和证据边界见 [实测记录](validation-mvp.md) 与 [独立复核](test-plan-review-mvp.md)。原b49的61项结果保留为历史。
 
 ## 两分钟可读的实际进度
 
@@ -13,9 +13,9 @@
 | GPT文字/图像 | 请求格式、Unicode流和错误控制逻辑 | 本账号模型权限、真实文字/图片答案、实际额度归属 |
 | 中文/英文语音 | locale选择和控制层状态/取消 | 实际识别准确率、声音自然程度、真实回声和路由 |
 | 摄像头 | 替身新图隔离、清理策略；真实UIKit重编码/GPS清除 | 眼镜注册、拍照新鲜度、实际相机关闭与HFP兼容 |
-| 安全/隐私 | 部分源审计与无缓存配置断言 | 删除失败安全性、真实运行日志/容器、真实撤销效果 |
+| 安全/隐私 | 删除失败分类、冷启动零读/显式恢复、实际App前置、源审计和无缓存配置 | 真实运行日志/容器、真实撤销效果；物理删除双失败仍需如实报告 |
 
-[逐项自动测试证据 CSV](test-inventory-mvp.csv) 有 **158条记录：61个XCTest方法 + 94个具名离线场景 + 3个仅有汇总证据的套件**。后3项分别报告120/43/61个断言；不能伪造为逐断言日志，也不把这些数与XCTest相加当独立功能覆盖数。离线套件全部数字为120/43/53/28/13/61，但有重复覆盖。
+[当前自动测试证据 CSV](test-inventory-20261019.csv) 有 **213条记录：84个去重XCTest方法 + 126个具名便携场景 + 3个仅汇总套件**，逐条保留对应SHA、源码及日志行。后3项仅报告120/43/61断言，不能伪造逐断言日志。这些数也不能相加当独立功能覆盖率。[旧158条索引](test-inventory-mvp.csv)仅为b49历史。
 
 [产品用例/执行登记 CSV](test-cases-mvp.csv) 是本页所有用例和生命周期参数展开后的登记表；每一行可独立填写实际结果、SHA、时间、证据和问题。已测行的actual_result标为PASS（仅限所列层），源审计标SOURCE REVIEW ONLY；未测行actual_result留空，不等于通过。独立 [Submission Review](test-plan-review-mvp.md) 区分“计划可执行”和“产品已通过”。
 
@@ -28,9 +28,9 @@
 - **未覆盖**：尚无该负面测试证据/必要测试入口；不能靠其他套件通过顶替。
 - **P0**：核心/安全必测。**P1**：异常或条件验证；缺条件保持未测，必须由Review明确批准替代证据或延期，不能自动豁免。
 
-三道门槛分别报告：**S0 本地准备**（旧61项通过，但新增A21/A22等尚待闭合）；**S1 真实订阅/联网**（全部未测，先文字）；**S2 iPhone/眼镜体验**（全部未测）。当前总体NOT ACCEPTED，PR保持draft。A22是[阻塞安全问题 #14](https://github.com/andywangyzfh/OpenVision/issues/14)；A23/A24/A25的补测在[#15](https://github.com/andywangyzfh/OpenVision/issues/15)；音频性能在[#13](https://github.com/andywangyzfh/OpenVision/issues/13)。必须修复阻塞安全问题、完成所需P0，并逐项处理P1后才可宣称整体验收；没有“软件测试过所以实际也可以”的推论。
+三道门槛分别报告：**S0本地准备 APPROVE**（A21～A25已按各自边界闭合）；**S1真实订阅/联网**（全部未测，先文字）；**S2 iPhone/眼镜**（全部未测）。当前总体NOT ACCEPTED，PR保持draft。退出安全[#14](https://github.com/andywangyzfh/OpenVision/issues/14)、协调器/身份/失败UI[#15](https://github.com/andywangyzfh/OpenVision/issues/15)已有本地执行及Review；音频性能[#13](https://github.com/andywangyzfh/OpenVision/issues/13)仍待真机测量。P0必须实际满足，P1的替代/延期必须经Review明示。没有“软件测试过所以实际也可以”的推论。
 
-模拟器正常入口必须不带 `--mvp-ui-testing` 或 `--mvp-smoke-testing`；前者使用fixture，后者关闭账号恢复。模拟器能否完成当前ASWebAuthenticationSession＋HTTP loopback组合本身就是O03待验证项，不预先保证，也不要求先连接手机。
+模拟器正常入口不带测试启动参数；`--mvp-ui-testing` 使用fixture。当前生产设计在每次冷启动都不读活动凭据，必须本人点击“恢复本机已有登录”或完成新OAuth后才激活；历史smoke专门关闭恢复的行为不再是正常入口的特殊差异。模拟器能否完成当前ASWebAuthenticationSession＋HTTP loopback组合本身就是O03待验证项，不预先保证，也不要求先连接手机。
 
 ## S0：本地/替身/安全前置
 
@@ -38,7 +38,7 @@
 | --- | --- | --- | --- | --- |
 | A01 · P0 · 干净构建与依赖 | 导出固定源码，生成工程，构建 App/平台/UI target。 前置：完整Xcode和runtime。 | DAT=1.0.1；编译和链接零错误。 | build log；BUILD-01 | **已测·真实本地** |
 | A02 · P0 · SDK未初始化安全拒绝 | 以真实未初始化driver/service调用注册、授权、回调和拍照。 前置：本地；不是完整失败UI。 | 不访问未配置shared、不崩溃；零硬件动作。 | PhotoServiceTests 3项新增guard回归 | **已测·控制层** |
-| A03 · P0 · 真实App启动与断连界面 | 运行production smoke，查看语言、对话、相机、账号设置。 前置：smoke关闭账号恢复。 | SDK真实初始化；显示未连接；设置可开；未恢复账号。 | MVPFlowTests.testProductionStartupWithoutRestoringAnyAccount | **已测·真实本地** |
+| A03 · P0 · 真实App启动与断连界面 | 正常无测试参数启动，查看语言、对话、相机、账号设置；终止后重开。 前置：生产冷启动本来就不读/激活账号。 | SDK真实初始化；显示未连接；设置可开；未恢复账号。 | testNormalProductionColdStartRequiresExplicitAccountAction + production startup；正常启动不读凭据、不激活账号；发送禁用 | **已测·正常生产入口** |
 | A04 · P0 · 语言选择与重启/旧值迁移 | 中文→终止重启→英文→终止重启；注入未知旧值。 前置：UI fixture无真实账号。 | 选择持久化；旧值安全回退中文；控件正确。 | MVPFlowTests的语言3项 | **已测·真实界面** |
 | A05 · P0 · STT/TTS语言与不可用能力 | 分别选择zh-CN/en-US；注入识别不可用、权限拒绝、缺声音、启动失败。 前置：没有实际识别/发音。 | 正确locale传给driver；明确错误、回idle、可重试。 | SpeechServiceTests；FlowChecks | **已测·替身** |
 | A06 · P0 · 短中文和空输入 | 提交你好/继续/好/是及空白、标点；重复final和静音回调。 前置：合成转录。 | 有效短句一次请求；空输入零请求；单次commit。 | CoreChecks；SpeechServiceTests；FlowChecks | **已测·替身** |
@@ -49,31 +49,31 @@
 | A11 · P0 · 照片A/B、重编码及GPS | 生产控制层先取A再B，注入旧回调；真实UIKit解码和JPEG重编码。 前置：图片处理真实，DAT效果替身。 | 每轮只含新图；长边≤1280；移除原EXIF/GPS；后续文字不带旧图。 | PhotoServiceTests；FlowChecks | **已测·混合边界** |
 | A12 · P0 · 相机拒绝、坏图、超时 | 注入未连接、拒绝权限、空/坏图、session/stream/photo各阶段失败超时。 前置：不等同真机断连。 | 明确失败；无视觉请求、旧图、手机相机回退或虚构回答。 | PhotoServiceTests；FlowChecks；UI photo failure | **已测·替身** |
 | A13 · P0 · 相机释放与关闭超时 | 成功、取消、错误、超时；让关闭状态迟到并再次拍照。 前置：不证明眼镜硬件真的关闭。 | 等待确认关闭；超时保留句柄、阻止重叠、后续先重试清理。 | PhotoServiceTests；FlowChecks | **已测·替身** |
-| A14 · P0 · OAuth/JWT安全契约 | PKCE/state/nonce/client替换、签名/issuer/aud/exp、scope拒绝等负例。 前置：未联系OpenAI授权服务。 | 错误身份拒绝；真实本地加密验签通过正确fixture。 | SubscriptionChecks 43汇总；Subscription XCTest 8 | **已测·合成数据** |
+| A14 · P0 · OAuth/JWT安全契约 | PKCE/state/nonce/client替换、签名/issuer/aud/exp、scope拒绝等负例。 前置：未联系OpenAI授权服务。 | 错误身份拒绝；真实本地加密验签通过正确fixture。 | SubscriptionChecks43汇总；Subscription XCTest14（其中IdentityTransport6） | **已测·合成数据** |
 | A15 · P0 · 本机回调listener与取消 | 对127.0.0.1发送正确/错误path、state、重复回调、取消ready竞态。 前置：合成code；不包含ASWebAuthenticationSession。 | 只收一次有效回调；错误拒绝；取消可清理。 | CallbackChecks 61汇总 | **已测·真实loopback** |
-| A16 · P0 · 账号保存/刷新/退出成功路径 | 并发刷新、持久化失败、signout迟到刷新；随机service真实Keychain CRUD/清理。 前置：刷新/撤销为替身；不含生产账号恢复。 | 单次刷新；未持久化token不交付；成功删除后独立store无法恢复。 | AccountChecks 13；KeychainStoreTests 2 | **已测·混合边界** |
+| A16 · P0 · 账号保存/刷新/退出成功路径 | 并发刷新、持久化失败、signout迟到刷新；随机service真实Keychain CRUD/清理。 前置：刷新/撤销为替身；不含生产账号恢复。 | 单次刷新；未持久化token不交付；成功删除后独立store无法恢复。 | AccountChecks39；KeychainStoreTests4，后者02e40d2平台回归；内存刷新/撤销替身与随机namespace真实Keychain分开 | **已测·混合边界** |
 | A17 · P0 · HTTP错误和SSE失败 | models/responses注入离线、超时、401/403/429/5xx、坏catalog、坏/空/中断SSE。 前置：URLSession真实但所有请求被拦截。 | 错误可见、回idle；无自动重试/付费回退；旧401不清新账号。 | NetworkChecks 28；FlowChecks | **已测·拦截传输** |
 | A18 · P0 · HTTP无缓存配置 | 检查生产PlanHTTPTransport的session configuration。 前置：不替代真实运行磁盘检查。 | ephemeral；URLCache/cookie/URL凭据库均禁用。 | Subscription隐私契约回归 | **已测·配置契约** |
-| A19 · P0 · 可达源码日志/存储审计 | 检查MVP实际target，排除上游未编译功能。 前置：不是供应商留存承诺或动态磁盘证明。 | 无生产token/code/正文打印、图片/聊天文件写入；Keychain为有意登录存储。 | 本轮重新生成privacy source audit | **已审·源码** |
+| A19 · P0 · 可达源码日志/存储审计 | 检查MVP实际target，排除上游未编译功能。 前置：不是供应商留存承诺或动态磁盘证明。 | 无生产token/code/正文打印、图片/聊天文件写入；Keychain为有意登录存储。 | 当前固定源码静态审计与66文件SHA256索引；不能代替运行时日志/容器检查 | **已复核·静态源码** |
 | A20 · P0 · 设置和后台恢复 | 打开设置Stop；实际切系统Settings、确认后台后返回；注入晚到结果。 前置：UI没有真实录音或拍摄。 | 显示暂停、相机关闭、需显式重新开始；旧任务不复活。 | MVPFlowTests recovery；FlowChecks | **已测·混合边界** |
-| A21 · P0 · 正式App Keychain登录前置 | 在正常生产App进程用专用合成key读/写/删，并确认不触碰真实记录。 前置：需准备可审查前置探针；不需用户账号。 | 与App同bundle/签名环境通过；不会在host-id写入前就报-34018。 | 空TestHost通过不能替代本项；仅确认主App有模拟器application-identifier | **未测** |
-| A22 · P0 · Keychain删除失败与重启 | 注入SecItemDelete失败，退出后冷启动，再恢复删除并重试。 前置：阻塞真实凭据试用前的安全收口；待GitHub问题处理。 | 不能谎报清除；残留凭据不得静默恢复登录；可见错误和安全恢复。 | 独立Review发现clear/delete忽略返回码；必须修复并新增负例 | **未覆盖** |
-| A23 · P1 · 完整App配置失败UI | 让真实App启动配置失败，打开设置并切中英。 前置：可审查测试配置；不用伪造初始化成功。 | App不崩溃；双语说明；眼镜操作禁用；文字/账号仍可使用。 | A02控制层通过；最终smoke实际走的是配置成功分支 | **未测** |
-| A24 · P1 · 完整授权协调器迟到令牌竞态 | 对实际AccountService的token/JWKS等待中取消、后台、重入，再送达迟到成功/失败。 前置：需协调器测试边界；无真实账号。 | 无晚到登录或遗留活动凭据；仅当前一代完成；可重新授权。 | listener/Store/VM分开通过；完整AccountService未执行此故障注入 | **未覆盖** |
-| A25 · P1 · 身份元数据与重定向边界 | 合成wrong issuer、外站/HTTP JWKS及revocation URL、跨源/降级HTTP重定向。 前置：独立假服务/URLSessiondelegate测试；不向外站发送真实token。 | 不信任错误issuer/来源；Authorization/token不流向非授权域；错误可恢复；跨域测试只用合成凭据及隔离服务。 | 源码有trusted检查；现有拦截器未证明真实redirect策略 | **未覆盖** |
+| A21 · P0 · 正式App Keychain登录前置 | 在正常生产App进程用专用合成key读/写/删，并确认不触碰真实记录。 前置：已实现DEBUG合成前置；不需用户账号。 | 与App同bundle/签名环境通过；不会在host-id写入前就报-34018。 | testProductionAppKeychainPreflightUsesOnlySyntheticRecords：实际App可执行文件内随机service CRUD；实际AppSupport随机marker missing/block/allow/block读回并删自有文件 | **已测·正式App/模拟器** |
+| A22 · P0 · Keychain删除失败与重启 | 注入SecItemDelete失败，退出后冷启动，再恢复删除并重试。 前置：本地软件收口已完成；双失败仍如实报告物理未删。 | 不能谎报清除；残留凭据不得静默恢复登录；可见错误和安全恢复。 | AccountChecks39 + KeychainStoreTests4 + 正常cold UI。删除返回码传播；block/delete双失败仍报unsafe且不谎报删除；Store冷构造零load，必须本人显式resume，残留不静默激活；物理删除失败仍如实保留 | **已测·隔离安全边界** |
+| A23 · P1 · 完整App配置失败UI | 让真实App启动配置失败，打开设置并切中英。 前置：DEBUG配置异常注入；无账号。 | App不崩溃；双语说明；眼镜操作禁用；文字/账号仍可使用。 | testProductionSDKSetupFailureKeepsAccountUIUsableInBothLanguages：DEBUG注入配置异常，真实App失败分支双语说明、相机/注册/授权禁用，账号界面可用 | **已测·实际失败UI** |
+| A24 · P1 · 完整授权协调器迟到令牌竞态 | 对实际AccountService的token/JWKS等待中取消、后台、重入，再送达迟到成功/失败。 前置：实际协调器依赖注入；无账号；真实浏览器另列O03。 | 无晚到登录或遗留活动凭据；仅当前一代完成；可重新授权。 | AccountCoordinatorTests12：token/identity阶段取消、Task.cancel、重入、迟到成功/失败、显式resume互斥、回调校验、真实Store通知；浏览器、token/JWKS网络及元数据为隔离替身；不是实际官方OAuth | **已测·实际协调器/效果替身** |
+| A25 · P1 · 身份元数据与重定向边界 | 合成wrong issuer、外站/HTTP JWKS及revocation URL、跨源/降级HTTP重定向。 前置：隔离拦截/本机HTTP；仅合成凭据。 | 不信任错误issuer/来源；Authorization/token不流向非授权域；错误可恢复；跨域测试只用合成凭据及隔离服务。 | IdentityTransportTests6：实际校验器+元数据/JWKS拦截；生产session在真实本机跨端口301/302/303/307/308不转发合成凭据；同源/跨域/HTTPS降级另为delegate fixture，不是外站或实际TLS实验 | **已测·身份/HTTP边界** |
 
 ## S1：真实订阅与联网（手机前优先）
 
 | ID / 优先级 / 项目 | 操作与前置 | 通过标准 | 已有证据及边界 | 当前状态 |
 | --- | --- | --- | --- | --- |
-| O01 · P0 · 生产入口和登录前置 | 关闭fixture/smoke参数；通过A21/A22；确认未登录、发送禁用。 前置：A21通过、A22修复；用户选择账号别名。 | 真实生产路径，账号与模型都不是fixture；无Codex缓存导入。 | 只有A03 smoke；不是本项 | **未测** |
+| O01 · P0 · 生产入口和登录前置 | 关闭fixture/smoke参数；通过A21/A22；确认未登录、发送禁用。 前置：A21/A22已完成本地软件收口；用户选择账号别名。 | 真实生产路径，账号与模型都不是fixture；无Codex缓存导入。 | 正常cold入口已测；完整真实登录会话仍未测 | **未测** |
 | O02 · P0 · 官方登录页与用户取消 | 点击Continue with ChatGPT；核对官方auth域；用户取消一次。 前置：用户能在系统授权页亲自操作。 | 回App未登录、可再试；无迟到登录和模型请求。 | A14/A15仅局部替身/loopback | **未测** |
 | O03 · P0 · 首次真实授权全链路 | 重新打开授权；用户选预定账号/工作区并同意plan usage；回调后进入App。 前置：官方服务、网络、账号资格；模拟器loopback兼容性不保证。 | 浏览器回调→token/JWKS验证→App Keychain→账号状态完成；sheet关闭；无秘密日志。 | 整条ASWebAuthenticationSession到OAuth链未测 | **未测** |
 | O04 · P0 · 真实模型目录 | 登录后刷新模型列表一次并选模型。 前置：O03成功；服务器返回权限。 | 列表和slug来自本账号、非fixture且非空；拒绝/空目录明确提示。 | A17仅拦截catalog | **未测** |
 | O05 · P0 · 真实中文文字问答 | 输入“一加二等于几？请只用一句中文回答”。 前置：O04；使用现有订阅授权，无API Key。 | 一次真实请求收到completed及合理中文答案；busy回idle；播报单独记结果。 | A07/A17不是真实推理 | **未测** |
 | O06 · P0 · 真实上下文 | 同会话输入“记住数字42”，再问“刚才的数字是多少”。 前置：O05。 | 两次请求；后者回答42；无额外自动重试。 | 只有fixture请求体/历史测试 | **未测** |
 | O07 · P0 · 真实英文与语言切换 | 切English问“What is one plus two? Answer in one English sentence.”，再切中文问一次。 前置：O05；本项2次文字请求。 | 对应语言回答，状态正常；不能只看picker认定语言模型成功。 | A04/A07为UI/合成数据 | **未测** |
-| O08 · P0 · 真实生产账号冷启动恢复 | 终止正常App并重开，检查账号和真实models，再发一次固定问题。 前置：O03；使用App本身Keychain service。 | 同一已授权账号恢复且可推理；不得以空TestHost Keychain代替。 | production smoke关闭restoreSession；本项无证据 | **未测** |
+| O08 · P0 · 真实生产账号冷启动恢复 | 终止正常App并重开，确认初始未激活；本人点击“恢复本机已有登录”，检查账号和真实models，再发一次固定问题。 前置：O03；使用App本身Keychain service。 | 未经本人点击不得读取活动凭据或请求模型；显式恢复同一已授权账号后可推理；不得以空TestHost Keychain代替。 | 完整真实账号的一键恢复仍无证据 | **未测** |
 | O09 · P0 · 真实请求Stop与重试 | 提交一条固定问题后立即Stop，等待迟到结果；再显式发一次。 前置：O05；可能消耗被取消请求额度，不承诺服务端零消耗。 | 本地停止、不展示/播报迟到结果、不自动重发；显式新请求成功。 | A09/A17替身通过 | **未测** |
 | O10 · P0 · 真实离线与恢复 | 保持App前台，暂断网络后刷新模型，恢复网络显式重试。 前置：允许短时断网；优先GET避免额外推理。 | 明确网络错误、无死循环；恢复后models可用。 | A17为URLProtocol拦截 | **未测** |
 | O11 · P0 · 真实退出与冷启动 | 退出登录→终止→重开→尝试发送。 前置：A22先修复；O03成功。 | 仍未登录、不能发请求；本地活动凭据删除经验证；不把浏览器SSO当残留token。 | A16仅随机service与成功删除路径 | **未测** |
@@ -121,7 +121,7 @@ H18～H21不是四个总勾选框。CSV已分别展开：Stop 4项、后台/锁�
 
 ## 尽量一次完成的执行顺序
 
-1. **我先做，不需要你交账号秘密**：完成A21生产App Keychain前置；修复并补测A22删除失败；处理A24/A25等Review缺口；准备记录和回归。未完成之前不让你反复登录试错。
+1. **已完成，无需账号秘密**：A21实际App前置、A22退出/冷启动收口、A23～A25及本地回归已获独立Review批准。下一步只在官方界面由本人授权；不把现有Codex登录当OpenVision会话。
 2. **一次电脑授权会话**：O01→O02取消→O03完整登录→O04目录→O18身份/usage确认→O05中文→O06上下文→O07英中→O08重启→O09取消/重试→O10断网恢复→O16日志检查→O11退出→O12再登录→O13用户远端撤销。先做真实文字；失败定位在当前层并修复后续跑，不以重做所有手机设置解决。
 3. **在线用量边界**：该电脑文字流程最多10次推理尝试（取消的请求也计入）；不为触发429耗尽额度，不购买点数，不自动切API Key。出现单独付款/API billing提示即停止。官方SIWC可能使用plan或已有credits，不能只凭OAuth/无API Key认定零额外消耗；先核对仅用套餐额度，credits若可能参与且无法排除就停止并询问这项选择，不擅自消费或修改账单设置。O14自然过期、O15额度控制按条件单列；O17合成JPEG探针目前入口待备，最多2次图像请求，且只能证明后端vision，不能替代H12的App/眼镜拍照。界面没有图片导入入口时不得让用户去找不存在的按钮。
 4. **一次手机/眼镜会话**：先安装/注册及路由；再把H04/H05两组语料、H06切语言、H12五张卡和H17五次交替合并到H25的20分钟会话，复用同一轮证据。故障矩阵另逐项执行；最后一起检查日志/退出/停用恢复。设备阶段所需推理次数在开始前记录预算，不能沿用“电脑10次”暗中扩大。

@@ -1,12 +1,44 @@
 # Validation record / 实测记录
 
-2026-10-18 更新：**整体 NOT ACCEPTED。原有61项本地自动测试通过，但不等于真实登录/联网可用，也不证明所有安全边界完整。** 独立Submission Review新增A21～A25，其中A22发现退出凭据删除失败不被报告，跟踪[#14](https://github.com/andywangyzfh/OpenVision/issues/14)；其余补测跟踪[#15](https://github.com/andywangyzfh/OpenVision/issues/15)。当前扩展S0未闭合，S1真实订阅/联网、S2手机/眼镜均未测。完整逐项状态以 [测试清单](test-plan-mvp.md) 和 [独立Review](test-plan-review-mvp.md) 为准。
+2026-10-19 更新：**S0 本地软件门槛已获独立 Review APPROVE；产品整体仍 NOT ACCEPTED。** S1 真实账号/模型/额度、S2 iPhone/眼镜均未测。没有读取其他 App 的凭据，也没有进行真实模型或付费 API 调用。
 
-以下保留原固定提交的**历史执行证据**；本轮没有复跑这61项，也没有安装到iPhone、真实登录、模型推理或付费API调用。旧“Gate 1 PASS”只适用于旧清单，不能继续作为安全完备或产品可用的结论。
+## 本轮固定源码与执行结果
+
+| 执行 | 固定源码 | 实际结果 |
+| --- | --- | --- |
+| 干净源码、clean iOS build、整套 XCTest | `c5c375b8d4893c2d66db60a4c88231186f7cdac9` | **83 PASS**：Core 17、Subscription 14、平台42、UI10；0失败/0跳过。实际 App 普通冷启动、Keychain+AppSupport 前置和中英配置失败 UI 均通过 |
+| 便携回归 | 同上 | Core120、Subscription43、实际VM59、HTTP28、Store39、真实本机callback61全部通过；这些是不同粒度的断言/场景，不能相加当独立功能数 |
+| 仅追加迟到失败测试后的完整平台回归 | `02e40d2629ff98586f138dbcd02ca0c1b869fe4b` | **43 PASS**：实际协调器12、Keychain4、相机控制14、语音控制13；0失败/0跳过 |
+
+两次归档逐文件SHA256核对：唯一差异为 `MVP/PlatformTests/AccountCoordinatorTests.swift`，产品源码完全一致。后一轮替代前一轮平台42项并新增一项，**不能把83+43算成126个独立测试**。当前 [执行索引](test-inventory-20261019.csv) 去重后为84个XCTest方法、126个具名便携场景、3条仅有汇总证据的套件记录（合计213条记录，不是213项独立功能）。[旧158条索引](test-inventory-mvp.csv) 保留为b49历史证据。
+
+环境仍为 macOS26.6.2 / Xcode27.1 / iOS Simulator27.1、arm64、DAT1.0.1。Git归档导出后替换整个MVP源码目录；`xcodebuild clean test`重新构建，SwiftPM使用独立scratch。SDK/依赖缓存复用不等于复用测试结果。
+
+## 安全缺口收口与证据边界
+
+- **A21**：实际App可执行文件内随机Keychain service读/写/更新/删；默认AppSupport目录随机marker的missing→block→allow→block读回及清理通过。不会读正式账号记录；模拟器签名环境通过不替代iPhone签名。
+- **A22**：删除结果传播；远程撤销为confirmed/notNeeded/unconfirmed，失败的新凭据事务不能继承旧确认。marker先阻断再删，删除失败保留可见清理入口；两处持久化同时失败仍报告未安全清除。**每次冷启动Store不load、不激活账号；必须本人显式恢复或新OAuth**，故残留不会静默登录。这个门槛不谎称物理记录已被删除。
+- **A23**：完整App配置失败分支的双语说明及禁用眼镜操作通过；文字账号界面仍可打开。
+- **A24**：实际AccountService及Store执行，浏览器、token/JWKS网络、元数据为隔离替身。token/身份阶段取消、Task.cancel、重入、迟到成功与失败、本人resume互斥、真实Store失效通知及可见提示均有执行证据。**不证明实际OpenAI浏览器授权或iOS loopback组合兼容**；它们仍是O03未测。
+- **A25**：元数据/JWKS拦截fixture和生产session真实本机跨端口3xx拒绝通过。HTTPS降级/同源策略含delegate fixture，不是真实TLS/外站端到端测试。
+- 精确“旧通知快照挂起后覆盖新cleanup”的特定交错采用静态世代修复，尚未直接确定性复现该交错；没有标成独立已测通过。Review接受本轮S0范围。
+- 完整模拟器运行仍记录10条音频主线程警告；[#13](https://github.com/andywangyzfh/OpenVision/issues/13) 保留，真机性能没有被宣称解决。
+
+本轮静态隐私审计为 `privacy-review-current-c5c375b.txt`，配套66文件源码哈希。它不是O16/H22动态日志/容器检查；后两项仍未测。
+
+本地证据目录：`/Users/andywang/Documents/Codex/2026-10-15/bang-wo/outputs/OpenVision-MVP-validation/local-c5c375b/`。内含两份源码tar、两个xcresult、summary、全部日志、源码清单与等价性记录。它不包含真实账号凭据或私人语料。可用 `MVP/scripts/export-test-inventory-current.py --evidence <该目录> --output <CSV>` 重建当前索引。
+
+下一步先进行独立的官方Pro授权及有上限的真实文字验收；模型资格、套餐/已有credits归属、真实恢复/刷新/退出均必须实际记录。无需先连接手机。iPhone/iOS精确版本、签名、Meta注册/权限、音频和新图仍留在S2。
+
+## 2026-10-18 历史执行记录
+
+2026-10-18 更新：**整体 NOT ACCEPTED。原有61项本地自动测试通过，但不等于真实登录/联网可用，也不证明所有安全边界完整。** 独立Submission Review新增A21～A25，其中A22发现退出凭据删除失败不被报告，跟踪[#14](https://github.com/andywangyzfh/OpenVision/issues/14)；其余补测跟踪[#15](https://github.com/andywangyzfh/OpenVision/issues/15)。截至2026-10-18当时扩展S0未闭合；2026-10-19结论见顶部。S1真实订阅/联网、S2手机/眼镜均未测。完整逐项状态以 [测试清单](test-plan-mvp.md) 和 [独立Review](test-plan-review-mvp.md) 为准。
+
+以下保留原固定提交的**历史执行证据**；没有重新执行b49固定提交；2026-10-19新源码的83项整套与后续平台回归见顶部。两轮均没有安装到iPhone、真实登录、模型推理或付费API调用。旧“Gate 1 PASS”只适用于旧清单，不能继续作为安全完备或产品可用的结论。
 
 测试源码：`b49c1db73780c18befc67cb4f6db5c84596874e0`。从该提交导出干净源码副本执行构建和测试；后续仅修改验收文档不改变被测代码。环境：macOS 26.6.2 (25G83)、Xcode 27.1 (27A9275)、iOS Simulator 27.1 (24A94425)、arm64；专用设备 `iPhone Duo OpenVision MVP`。Meta DAT 固定 1.0.1。Xcode 许可及首次初始化已由用户完成；命令通过 `DEVELOPER_DIR` 选择 Xcode，未修改全局 Command Line Tools 选择。
 
-## 已执行的最终测试
+## 2026-10-18历史：已执行的最终测试
 
 | 套件 | 实际结果 | 验证边界 |
 | --- | --- | --- |
@@ -46,7 +78,7 @@
 
 以上证明软件行为，不证明真实声学效果、镜头画质或硬件已释放。应用自身的存储／日志审计不构成 Apple、Meta 或模型服务端不处理／保留数据的承诺。系统浏览器 SSO 与有意保存在应用 Keychain 的登录记录也不同于 HTTP 缓存。
 
-## 发现、修复及保留事项
+## 2026-10-18历史：发现、修复及保留事项
 
 初次 `b6a3809` 本地运行和 [CI 39111998790](https://github.com/andywangyzfh/OpenVision/actions/runs/39111998790) 均失败，未计为通过。未签名测试进程没有 Keychain 权限（-34018）；新增无账号／硬件初始化的独立测试宿主及仅模拟器使用的测试 entitlement，并采用临时本地签名后，实际 Keychain 测试通过。该测试 entitlement 不用于正式 iPhone App。
 
@@ -58,7 +90,7 @@
 
 Xcode 留下 AVAudioSession 主线程激活／停用的运行时性能警告，以及 SDK build 编号解析／额外诊断收集工具路径警告。结构化结果仍为 36/36 Passed，未出现界面挂死；音频延迟和实际设备稳定性在 [issue #13](https://github.com/andywangyzfh/OpenVision/issues/13) 及 Gate 2 跟踪，不能用模拟器宣称解决。
 
-## 证据及复现
+## 2026-10-18历史：证据及复现
 
 本地完整证据（日志、结构化摘要、xcresult、源码 SHA 和环境）保存于本任务的 `outputs/OpenVision-MVP-validation/local-b49c1db/`，不提交原始用户内容。最终 xcresult：`Final-b49c1db.xcresult`。远程 [CI 39113878097](https://github.com/andywangyzfh/OpenVision/actions/runs/39113878097) 对应相同代码，现已完成并为 **success**；这些仍只证明相同的自动测试，不证明真实账号或眼镜。
 
@@ -73,7 +105,7 @@ MVP_SIMULATOR_ID=<available-simulator-udid> MVP_BUILD_ROOT=/private/tmp/openvisi
 
 历史支持证据：[bafbb67 CI](https://github.com/andywangyzfh/OpenVision/actions/runs/39105717171) 的 17+7+3 测试曾通过；后续 `c6e0c1b` 本机完整 17+7+29+7 及离线检查通过；它们不代替最后的 `b49c1db` 结果。`c6e0c1b` 的远程运行因新提交被取消。
 
-## Gate 2 保持 NOT RUN
+## 2026-10-18历史：Gate 2 保持 NOT RUN
 
 真实 iPhone 安装／签名、眼镜注册及权限、实际中文／英文 STT/TTS 与蓝牙输入、HFP／拍照交替、真实 A/B 拍照、GPT 订阅账号授权及文字／图片推理、断网与锁屏中断、20 分钟稳定性测试，均待后续执行。按照用户要求，本轮不依赖手机。PR 保持 draft，跟踪 issue #1；尚不能称为真机验收或可发布版本。
 

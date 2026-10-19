@@ -1,6 +1,8 @@
 # Bilingual MVP acceptance / 双语 MVP 验收
 
-2026-10-18 独立Review更新：当前**整体未验收**。执行入口与逐项状态以 [完整测试用例](test-plan-mvp.md)、[执行登记CSV](test-cases-mvp.csv) 和 [独立Review](test-plan-review-mvp.md) 为准。新增本地安全前置A21～A25尚待闭合；原61项PASS只保留为历史集合结果。真实联网S1单独先于手机S2，不能把它统称“缺手机所以没测”。
+2026-10-19 当前结论：**S0本地软件门槛 APPROVE；S1/S2未测，整体未验收。** 本轮83项完整XCTest与仅测试变化后的43项平台回归有重叠；逐项结果及双SHA见 [实测记录](validation-mvp.md)、[当前索引](test-inventory-20261019.csv)。每次冷启动必须本人显式恢复登录，不会自动读活动凭据。
+
+2026-10-18 历史独立Review：当前**整体未验收**。执行入口与逐项状态以 [完整测试用例](test-plan-mvp.md)、[执行登记CSV](test-cases-mvp.csv) 和 [独立Review](test-plan-review-mvp.md) 为准。新增本地安全前置A21～A25尚待闭合；原61项PASS只保留为历史集合结果。真实联网S1单独先于手机S2，不能把它统称“缺手机所以没测”。
 
 This is the release contract, **not a record that the checks have passed**. Record actual results against the tested Git commit in the evidence table below. A parser check, mocked test, simulator run and glasses test establish different facts and must not be substituted for one another.
 
@@ -50,6 +52,16 @@ Levels: **A** = deterministic automated test with fixtures/mocks; **S** = simula
 ## Gate 2: installation and device acceptance
 
 Prerequisites: local gate passed; a connected/unlocked iPhone with supported iOS and Developer Mode; Apple signing configured; Meta AI app, Meta developer registration/permissions and the user's glasses available. Record the exact firmware/DAT versions. Account login and permissions are performed by the user through the provider/system UI. Never copy an existing Codex CLI token into the app.
+
+### One-time setup explained / 一次性准备说明
+
+Three separate settings are involved; no phone is required for the account-free local gate.
+
+1. **Xcode Apple account / Apple 签名**: on the Mac, open Xcode → Settings → Accounts and add your Apple Account yourself. The project uses that account's Team to sign the test app for your iPhone. Basic personal-device testing can use the free Personal Team; its provisioning normally expires after seven days and requires rebuilding. A paid developer membership is not automatically required for that basic installation. Signing must still be verified for the actual Meta app configuration. [Apple account and Personal Team](https://developer.apple.com/help/account/basics/about-your-developer-account).
+2. **iPhone Developer Mode / 手机开发者模式**: after pairing the unlocked iPhone with Xcode, enable Settings → Privacy & Security → Developer Mode, restart, and confirm on the phone. If the setting is absent, pair with Xcode first. This permits development-signed apps to run. [Apple instructions](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device/).
+3. **Meta AI Developer Mode / 眼镜开发模式**: in the paired Meta AI app, open Settings → App Info, tap App version **five times**, then enable Developer Mode. This is separate from the iPhone switch. App registration and camera permission are granted later through the real Meta flow. A firmware update may require enabling it again. [Meta's official DAT cookbook](https://dev.meta.ai/docs/cookbook/rayban-openclaw).
+
+ChatGPT Pro eligibility is separate from app authorization: the user must sign in and authorize OpenVision through OpenAI's official interface. A Codex plan readout, browser sign-in, or subscription label does not prove that OpenVision owns a usable session. Do not request passwords, MFA codes, tokens, or private signing keys in chat. Record the phone's exact iOS version from the connected device rather than treating “latest” as a verified version.
 
 | ID | Level | Test and acceptance condition |
 | --- | --- | --- |
