@@ -21,7 +21,7 @@ final class FixtureVault: @unchecked Sendable {
 
 struct MockReply: Sendable {
     var status = 200
-    var mime = "text/event-stream; charset=utf-8"
+    var mime: String? = "text/event-stream; charset=utf-8"
     var body = Data()
     var failure: URLError.Code?
     var chunkSize = 2
@@ -60,7 +60,7 @@ final class OfflineURLProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(code)); return
         }
         let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": reply.mime])!
+            headerFields: reply.mime.map { ["Content-Type": $0] } ?? [:])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         let bytes = [UInt8](reply.body)
         let size = max(1, reply.chunkSize)

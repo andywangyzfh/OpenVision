@@ -45,8 +45,13 @@ actor ChatGPTPlanClient {
             throw PlanError.reauthenticationRequired
         }
         guard http.statusCode == 200 else { throw PlanError.service("http_\(http.statusCode)") }
-        guard http.value(forHTTPHeaderField: "Content-Type")?.lowercased().contains("text/event-stream") == true else {
-            throw PlanError.malformedResponse
+        // The plan-serving route can omit Content-Type. In that case the body still has
+        // to pass SSE framing, event validation and response.completed below.
+        if let contentType = http.value(forHTTPHeaderField: "Content-Type") {
+            let mediaType = contentType.components(separatedBy: ";")[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard mediaType.caseInsensitiveCompare("text/event-stream") == .orderedSame else {
+                throw PlanError.malformedResponse
+            }
         }
         var stream = ResponseStream()
         for try await byte in bytes {

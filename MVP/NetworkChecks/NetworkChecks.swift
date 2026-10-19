@@ -87,6 +87,17 @@ struct NetworkChecks {
             try expect(content.last?["image_url"] as? String == "data:image/jpeg;base64," + image.base64EncodedString(), "JPEG payload changed")
             try expect(vault.invalidationCalls().isEmpty, "Successful inference invalidated account")
         }))
+        scenarios.append(("missing Content-Type accepts only a fully completed SSE reply", {
+            let reply = MockReply(mime: nil, body: sse([#"{"type":"response.output_text.delta","delta":"三。 Three."}"#, completed]), chunkSize: 1)
+            let probe = HTTPURLResponse(url: URL(string: SubscriptionContract.resource + "/responses")!, statusCode: 200,
+                httpVersion: "HTTP/1.1", headerFields: [:])!
+            try expect(probe.value(forHTTPHeaderField: "Content-Type") == nil && probe.mimeType == nil, "Fixture unexpectedly has a MIME type")
+            let (client, session, vault) = fixture(reply)
+            defer { session.invalidateAndCancel() }
+            let answer = try await client.respond(model: "fixture-plan", instructions: "Use the selected language.", turns: [.init(role: "user", text: "1+2")])
+            try expect(answer == "三。 Three.", "Headerless valid SSE did not complete")
+            try expect(MockLedger.shared.snapshot().count == 1 && vault.invalidationCalls().isEmpty, "Headerless response retried or invalidated account")
+        }))
         for endpoint in Endpoint.allCases {
             for status in [401, 403, 429, 500, 503] {
                 scenarios.append(("\(endpoint.rawValue) HTTP \(status) has correct failure and zero retries", {
@@ -126,6 +137,13 @@ struct NetworkChecks {
         }
         let streamFailures: [(String, MockReply, PlanError?)] = [
             ("wrong MIME", .init(mime: "application/json", body: sse([completed])), .malformedResponse),
+            ("misleading explicit MIME", .init(mime: "application/json; note=text/event-stream", body: sse([#"{"type":"response.output_text.delta","delta":"must not pass"}"#, completed])), .malformedResponse),
+            ("empty explicit MIME", .init(mime: "", body: sse([#"{"type":"response.output_text.delta","delta":"must not pass"}"#, completed])), .malformedResponse),
+            ("missing MIME with plain JSON", .init(mime: nil, body: Data(#"{"type":"response.completed","response":{"status":"completed","output":[{"content":[{"type":"output_text","text":"not SSE"}]}]}}"#.utf8)), .incompleteStream),
+            ("missing MIME with HTML", .init(mime: nil, body: Data("<!doctype html><html><body>Not an event stream.</body></html>".utf8)), .incompleteStream),
+            ("missing MIME with empty body", .init(mime: nil, body: Data()), .incompleteStream),
+            ("missing MIME with partial SSE", .init(mime: nil, body: sse([#"{"type":"response.output_text.delta","delta":"partial"}"#])), .incompleteStream),
+            ("missing MIME with late quota failure", .init(mime: nil, body: sse([#"{"type":"response.output_text.delta","delta":"partial"}"#, #"{"type":"response.failed","response":{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}}"#])), .service("subscription_sharing_usage_limit_exceeded")),
             ("malformed SSE JSON", .init(body: sse(["{malformed", completed])), nil),
             ("empty stream", .init(body: Data()), .incompleteStream),
             ("completed but empty reply", .init(body: sse([completed])), .service("empty_reply")),
