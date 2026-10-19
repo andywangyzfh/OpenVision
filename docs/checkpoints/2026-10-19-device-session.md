@@ -1,6 +1,12 @@
 # OpenVision checkpoint — 2026-10-19
 
-**用户明确要求暂停：出门并断开手机。真机操作与测试已停止；不得自动续测或自行唤起麦克风/相机。下次用户要求继续时从这里恢复。**
+**后续本地检查点：e8a726727f17956f40cdcf05dbcdcd5bc1e6fbb1；手机仍保持暂停。** 新语音/相机安全范围本地软件已获独立多agent APPROVE。当前平台57、最终UI25、Core17、Subscription14的分组运行覆盖113个不同方法；另有Flow109、Inputs25，不能重复加总。完整82的79/3与81/1失败、中断UI15的真实设置失败和取消均保留。新增固定footer返回设置入口，未声称原native Done已修好。证据和范围见[本机回归](../local-benchmark-mvp.md)与[独立Review](../test-plan-review-mvp.md)。
+
+语音优先，按需识图保留共同验收；默认关闭的前台镜腿双击待命[#20](https://github.com/andywangyzfh/OpenVision/issues/20)、每次确认/一次性相机授权[#19](https://github.com/andywangyzfh/OpenVision/issues/19)、phone排队Start防Stop后复活[#22](https://github.com/andywangyzfh/OpenVision/issues/22)均已本地验证，真实手势/指示灯/硬件未测。**本轮没有操作手机、实际麦克风/相机或真实授权/模型；安装版本仍旧b1c2ea5 / 0.1.0(2)，本次修改未装机。** 原Xcode/手机信任已完成，恢复时无需重复要求。
+
+Mac模型比较入口已准备并Review；实际登录、最多39次pilot和模型排名仍NOT RUN（[#18](https://github.com/andywangyzfh/OpenVision/issues/18)）。下次由用户恢复实际阶段后：先确认本次消费限制/当前官方额度，再进行本机独立官方授权和比较；手机随后重新连接解锁、正常签名安装新build，显式恢复本App登录，按G06/G07及真实STT矩阵测试。先在私人环境确认摄像头指示灯，若任何意外亮灯立即停测记P0。Inputs需官方能力/兼容固件；不使用拍摄键作为语音触发，也不承诺锁屏/后台激活。产品仍NOT ACCEPTED，主issue开放、PR为draft。
+
+## 以下为出门前历史记录（当时的WIP说明已由上方本地验收更新）
 
 ## 已安装且已测试的版本
 

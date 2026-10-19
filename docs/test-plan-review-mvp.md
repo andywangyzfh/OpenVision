@@ -1,5 +1,26 @@
 # Independent Submission Review / 独立测试计划审阅
 
+## 2026-10-19 新相机/触控范围独立审查（本地软件APPROVE）
+
+独立 `submission_review` 只读审查代码、冻结源码和真实执行证据，未实现修复、未操作模拟器/手机、未真实登录或调用模型。`bilingual_core`实现/复核相机与VM，`subscription_auth`实现Inputs并复核边界，`acceptance_review`维护逐项证据登记。语音优先，识图共同保留验收；P0误激活不以移除识图规避。
+
+固定产品源码 `e8a726727f17956f40cdcf05dbcdcd5bc1e6fbb1`：最终UI25全部通过；平台57与Core17/Subscription14分别已执行通过且参与编译的相关源未变。113为不同方法的分组运行覆盖，不是一次113项或82项全绿。109Flow包含原107；Inputs25独立场景，不与XCTest重复加总。View同步截取UUID已源码复核；实际VM的过期拒绝与正常开始用例均实跑；UI25未确定性复现精确排队交错；当前版本尚未安装到真实手机。
+
+保留全部失败：完整82两轮79/3和81/1；中断UI15的13PASS/1真实FAIL/1CANCELED（Xcode记13/2），剩余10未完成。native Done无效激活位置仍是观察事实；产品增加固定footer返回按钮，测试只真实点击一次、无重试/程序关闭、保留截图和后台断言，最终完整UI25通过。本地键盘/frame及音频警告#13/#21继续开放，不声称系统框架根因或警告清零。
+
+当前40文件静态清单：source-set `1a5f32bd3273bdb92e389938699bcf73eaa0693da7584fc9d49708d9d5c8ddca`，报告SHA `0eabfd1dc96e013be2ede3ad380a16b66f0a5ba5b5892b32755ffbaa64c816bd`，manifestSHA `7ef45640885d4e07a86aa07587f9409acc96a2d7a80ee820684c5a40cafbc506`，独立静态报告SHA `7a2c43b9d8002a7600aa9907e67ff55168394d5f9726f331a311f89c6089bb71`。30个生产Swift文件全覆盖；39项与UI输入清单一致，pbxproj独立列入。旧报告仅对各自冻结源有效；当前全文件Git等价另有证据。静态不是动态日志/磁盘/SDK零网络或服务端零留存承诺。
+
+最终本地审批原件：任务outputs/.../local-followup-20261019/ui-footer-final/final-local-acceptance-review.txt。**批准进入之后的真实验收准备，产品仍NOT ACCEPTED**；新版官方OAuth、模型比较、真实STT/音频、眼镜手势/固件/Inputs能力、摄像头指示灯、HFP、新图及稳定性未验收。主issue开放、PR保持draft。
+
+
+## 2026-10-19 本机续测独立审查
+
+`submission_review`只读核对本轮代码、实际日志与SHA256，没有参与实现、没有操纵模拟器/手机或真实登录推理。计时13/HTTP36的测试与范围可批准；旧VM状态残留复现及修复Flow72/重复focused13的逻辑审查可批准。
+
+Mac入口先前发现的取消/关窗后台请求、授权失败残留、记录重复/落盘失败误报、重复repetition误排名、provenance冒认及登录前消费勾选问题均已修复并核验。正式Swift6构建、生命周期14、公开夹具与报告self-test PASS；独立重算18个输入哈希0 mismatch，digest `77b5eaa57bf2e91ecd7e9f7ae3834e7684fc0211dc0ca2f8d0f9857d248bc3e5`，dirty=true。结论**Mac入口 READY FOR USER AUTHORIZATION**，真实授权、39次推理与模型排名均NOT RUN。
+
+UI初轮54 PASS / 8 FAIL及中间定向2 PASS / 1 FAIL保留。Review发现键盘聚焦会隐藏Stop/相机指示，已修复并新增两项真实键盘下的Stop用例；mandatory键盘存在断言消除了静默跳过。该修复当前SOURCE REVIEW APPROVE；完整实际UI结果尚待执行核验，不能把代码批准写成UI已通过。手机仍暂停，整体NOT ACCEPTED，PR保持draft。
+
 ## 2026-10-19 真机缺失MIME局部复核
 
 独立submission_review只读核对b1c2ea5的3文件diff及network36日志，未自行实发或重跑，结论局部修复APPROVE。显式错误MIME仍拒绝，缺失MIME必须通过既有SSE/完成/非空文本。主agent随后正常真机2次完整短回答，第二次播报用户确认有声正常。#17的状态文案WIP未经过测试或本次Review，不在已安装版本中。用户已要求暂停；整体仍NOT ACCEPTED，见[检查点](checkpoints/2026-10-19-device-session.md)。

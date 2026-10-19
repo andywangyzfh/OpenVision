@@ -2,13 +2,13 @@
 
 This is Andy’s development fork of [rayl15/OpenVision](https://github.com/rayl15/OpenVision), for iPhone + displayless Ray-Ban Meta Gen 3. Original MIT attribution is retained in [LICENSE](LICENSE). Build **MVP/OpenVisionMVP.xcodeproj**, not the upstream full-feature project.
 
-开发状态：**S0本地软件门槛已获独立Review批准，产品整体仍未验收**。83项完整XCTest及追加测试后的43项平台回归均通过（两轮有重叠，去重84个方法）；真机启动与合成存储预检、真实官方授权及模型目录已通过；[#16](https://github.com/andywangyzfh/OpenVision/issues/16)已修复，2次真实短回答及一次用户确认播报通过；[#17](https://github.com/andywangyzfh/OpenVision/issues/17)状态文案修复WIP尚未测试/装机，真实STT/眼镜尚未验收。用户已要求暂停，[续测检查点](docs/checkpoints/2026-10-19-device-session.md)。以 [完整测试清单与当前状态](docs/test-plan-mvp.md)、[独立Review](docs/test-plan-review-mvp.md) 和 [本轮实测记录](docs/validation-mvp.md) 为准。没有发布可安装的验收版本。
+开发状态：**新增范围的本地软件门槛已获独立多agent Review APPROVE；产品整体仍 NOT ACCEPTED，手机测试继续暂停。** 语音优先，按需识图保留；新增镜腿双击待命、每张照片确认及一次性授权。当前软件覆盖为平台57、最终UI25、Core17、Subscription14，共113个不同XCTest方法在各自运行中通过；另有实际VM109、Inputs25场景通过，不能与XCTest数相加。完整82项曾出现79/3和81/1，两轮失败均保留；最终UI25单独重跑25/25，平台57与包测试复用字节等价的已测源码，未声称单次113项整套通过。历史手机b1c2ea5 / 0.1.0(2)仅证明官方授权、两次短回答和一次可闻播报，**未安装本次修复**。真实眼镜双击/HFP/指示灯、新版OAuth、STT和模型测速仍未验收；没有最快模型结论。见[用例与结果](docs/local-benchmark-mvp.md)、[完整清单](docs/test-plan-mvp.md)、[独立Review](docs/test-plan-review-mvp.md)、[实测记录](docs/validation-mvp.md)和[真机检查点](docs/checkpoints/2026-10-19-device-session.md)。PR保持draft。
 
 ## 第一版功能
 
 - 中文 / English 两个明确的语音模式；iPhone 原生语音识别和播报。
-- 点击“开始对话”后分轮对话；回答播报结束再听下一轮；随时“停止”。
-- 点击相机，或说“看看这个 / 拍照看看 / What do you see?”，临时启动眼镜相机，拍一张新照片后关闭，再询问模型。
+- 眼镜触控语音默认关闭；设置中开启并手动进入“双击待命”，返回主界面双击镜腿开始收音，再次双击停止。实验性 Meta Inputs 能力和固件仍需真机验证；App 需在前台，离开前台后要重新待命。手机“开始对话”也保留。
+- 点击相机，或说“看看这个 / 拍照看看 / What do you see?”，先显示拍照确认；仅本人确认本次拍一张后才临时开启眼镜相机。取消、停止或离开前台会撤销确认；普通语音与双击不会开启相机。
 - 官方 **Continue with ChatGPT** 登录，优先使用现有 ChatGPT 订阅额度。授权、账号资格及图片能力需实际账号验证；没有自动 API Key 付费回退。
 - 仅前台运行；会话只在内存中，照片仅用于当前请求。清空会话和退出登录独立可用。
 
@@ -16,7 +16,7 @@ This is Andy’s development fork of [rayl15/OpenVision](https://github.com/rayl
 
 ## 本地开发与测试
 
-需要完整 Xcode（含 iOS Simulator）和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。CI 固定使用已验证的 **Xcode 26.6 / Swift 6.3.3**；本机 Xcode 27.1 的本轮本地回归与扩展S0安全前置已获独立Review批准；真实账号及设备结果仍以逐项清单为准。只有 Command Line Tools 时只能运行离线检查。目标 iOS 17.2+；Meta DAT 固定 1.0.1；真实设备/固件兼容性仍需验证。
+需要完整 Xcode（含 iOS Simulator）和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。CI 固定使用已验证的 **Xcode 26.6 / Swift 6.3.3**；本机 Xcode 27.1 的当前软件范围已获独立Review批准（运行与复用边界见实测记录）；真实账号及设备结果仍以逐项清单为准。只有 Command Line Tools 时只能运行离线检查。目标 iOS 17.2+；Meta DAT 固定 1.0.1；真实设备/固件兼容性仍需验证。
 
 ```sh
 brew install xcodegen
@@ -27,7 +27,7 @@ swift test --package-path MVP/Subscription
 bash MVP/scripts/check-ios.sh
 ```
 
-`check-local.sh` 执行 120 项核心行为断言、43 项认证/流处理断言、59 个实际对话 ViewModel 的异步场景、28 个 HTTP 异常场景、39 个账号存储场景及 61 项本地回调断言，以及 Swift 语法解析、plist 校验及工程生成。ViewModel 测试使用实际生产代码，硬件/账号/模型传输为离线替身。回调测试仅连接本机 127.0.0.1，使用合成授权码。**它不是 iOS 编译或完整验收通过。** `check-ios.sh` 自动寻找完整 Xcode、检查首次初始化，选择已安装的 iPhone 模拟器并执行实际 App 构建、生产控制层测试与 UI 测试；测试结果写到忽略提交的 `.test-results/`。UI fixture 明确无网络、无麦克风，也不会伪造成功的硬件拍照。其通过不能替代眼镜/真实账号测试。
+`check-local.sh` 执行 120 项核心行为断言、43 项认证/流处理断言、实际对话 ViewModel 的异步场景（当前109个），以及25个Inputs场景、36 个 HTTP 异常场景、39 个账号存储场景及 61 项本地回调断言，以及 Swift 语法解析、plist 校验及工程生成。ViewModel 测试使用实际生产代码，硬件/账号/模型传输为离线替身。回调测试仅连接本机 127.0.0.1，使用合成授权码。**它不是 iOS 编译或完整验收通过。** `check-ios.sh` 自动寻找完整 Xcode、检查首次初始化，选择已安装的 iPhone 模拟器并执行实际 App 构建、生产控制层测试与 UI 测试；测试结果写到忽略提交的 `.test-results/`。UI fixture 明确无网络、无麦克风，也不会伪造成功的硬件拍照。其通过不能替代眼镜/真实账号测试。
 
 完整验收按 [S0本地、S1真实联网、S2设备三道门槛](docs/test-plan-mvp.md) 执行；[原验收合同](docs/acceptance-mvp.md) 保留功能标准与历史映射。GitHub CI 提供独立构建反馈，不能代替用户要求的本地测试。未通过本地 gate 前不进行 iPhone 安装。
 
@@ -39,7 +39,7 @@ Xcode 账号签名、iPhone Developer Mode、Meta AI Developer Mode 是三个独
 2. 打开 `MVP/OpenVisionMVP.xcodeproj`，选择 OpenVisionMVP scheme 和你的 iPhone，在 Signing & Capabilities 选择自己的 Team。无需提交签名文件或账号密码。
 3. 首次调试使用官方 Meta AI App 的开发者模式。工程默认 `META_APP_ID=0`；在设置中“安装／更新官方开发组件”，连接／注册眼镜并单独授予相机权限。生产分发需按 Meta 官方流程配置 App ID/token。
 4. App 设置中 **Continue with ChatGPT**，由你在系统授权页登录并同意授权；选择服务器返回的可用模型。不读取 Codex/ChatGPT App 的登录缓存。
-5. 先关闭蓝牙麦克风选项，验证 iPhone 中文对话。再连接眼镜、断开其他蓝牙耳机，打开蓝牙输入并查看实际设备名，执行验收语料和拍照卡 A/B 测试。
+5. 确认 Meta 已为开发账号开放 Inputs 触控能力；开发者模式或注册成功本身不证明获批。设置中开启“允许眼镜触控语音”并点“开启双击待命”，返回主界面测试镜腿双击。此功能不能通过拍摄键屏蔽原生拍照，也不承诺后台/锁屏冷启动 App。先关闭蓝牙麦克风选项，验证 iPhone 中文对话。再连接眼镜、断开其他蓝牙耳机，打开蓝牙输入并查看实际设备名，执行验收语料和拍照卡 A/B 测试。
 6. 眼镜语音和拍照交替使用时，App 会先释放收音、临时拍照并关闭相机会话，再恢复语音。固件/HFP 限制仍需实测；失败时保留错误状态，不偷偷使用手机相机或旧照片。
 
 免费 Apple 开发账号的设备签名有期限，后续通常需要重新由 Xcode 签名安装；实际期限以 Xcode/Apple 账号显示为准。TestFlight/正式分发在首轮验收之外。

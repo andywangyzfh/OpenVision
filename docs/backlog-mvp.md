@@ -8,7 +8,7 @@ The fork's linked GitHub issues are the source of truth. This file indexes the s
 
 **Suggested labels:** `mvp`, `enhancement`
 
-**Outcome:** On iPhone + US displayless Ray-Ban Meta Gen 3, manually start a conversation in Mandarin or English, request a fresh glasses photograph on demand, receive a spoken answer, and use the existing ChatGPT subscription where supported without silent paid fallback.
+**Outcome:** On iPhone + US displayless Ray-Ban Meta Gen 3, explicitly enable foreground glasses double-tap standby, start/stop Mandarin or English GPT voice from the temple gesture, and request a fresh glasses photograph only after per-photo App confirmation, receive a spoken answer, and use the existing ChatGPT subscription where supported without silent paid fallback.
 
 **Definition of done:** Implement the scoped flow; publish actual test evidence for both gates in [acceptance-mvp.md](acceptance-mvp.md); list blockers honestly. Local simulator build/run must pass before iPhone installation. Include signing/Meta registration, auth limitation and uninstall/sign-out instructions. Keep original license attribution.
 
@@ -18,9 +18,19 @@ The fork's linked GitHub issues are the source of truth. This file indexes the s
 
 ## Local validation follow-up
 
-[Issue #13 — Investigate AVAudioSession main-thread warnings before device soak](https://github.com/andywangyzfh/OpenVision/issues/13): all local tests pass, but Xcode reports synchronous audio-session performance warnings. Measure responsiveness and HFP/photo transitions on the real device before AUDIO-02 / RES-01 / SOAK-01 sign-off; preserve cancellation and route ownership if scheduling changes are required. This is separate from adding new features.
+[Issue #13 — Investigate AVAudioSession main-thread warnings before device soak](https://github.com/andywangyzfh/OpenVision/issues/13): the earlier local baseline passed, but Xcode reports synchronous audio-session performance warnings. Measure responsiveness and HFP/photo transitions on the real device before AUDIO-02 / RES-01 / SOAK-01 sign-off; preserve cancellation and route ownership if scheduling changes are required. This is separate from adding new features.
 
 新增独立Review阻塞项：[凭据删除失败安全处理 #14](https://github.com/andywangyzfh/OpenVision/issues/14)，以及[完整授权协调器/身份传输边界补测 #15](https://github.com/andywangyzfh/OpenVision/issues/15)。它们属于MVP质量收口，不是可自动豁免的后续功能。完整状态见 [测试清单](test-plan-mvp.md)。
+
+## Current MVP priorities and follow-up
+
+1. [#20 核心：镜腿双击GPT语音](https://github.com/andywangyzfh/OpenVision/issues/20)：默认关闭、显式前台待命，captouch only；真实Inputs权限、固件、HFP和按手势完成中英问答仍需实测。
+2. [#19 P0：防意外启动相机](https://github.com/andywangyzfh/OpenVision/issues/19)：每次确认、一次性授权、撤销/重放/迟到事件、会话清理互斥；真实摄像头指示灯与原生拍摄行为仍需观察。
+3. 按需识图保留在同版，不降级移除；优先级低于语音。当前图A/B与普通轮不重发图须共同验收。
+4. [#22 排队开始在Stop后不得重新开麦](https://github.com/andywangyzfh/OpenVision/issues/22)：同步捕获激活世代，本地Flow109正反例通过；新版本未装到手机。
+5. [#17 播报完成/停止状态](https://github.com/andywangyzfh/OpenVision/issues/17)、[#18 有上限的本机模型比较](https://github.com/andywangyzfh/OpenVision/issues/18)、[#21 键盘布局警告](https://github.com/andywangyzfh/OpenVision/issues/21)分别保留软件回归、真实模型和设备限制。
+
+完整逐轮结果见[本机回归](local-benchmark-mvp.md)及[执行索引](test-inventory-local-followup-20261019.csv)。历史通过不能覆盖新增范围失败；没有运行真实模型就没有速度排名。当前本地软件已获独立Review批准；平台57、最终UI25、Core17、Subscription14为分组运行覆盖，历史失败不删。#21同时保留native Done无效激活位置，固定footer返回入口通过UI验收，未声称原工具栏已修复。手机仍为旧b1c2ea5。产品主issue开放、PR为draft。
 
 ## Deferred issues
 

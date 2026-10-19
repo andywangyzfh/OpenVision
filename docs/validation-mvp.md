@@ -1,12 +1,34 @@
 # Validation record / 实测记录
 
-## 暂停检查点（2026-10-19）
+## 本机续测（2026-10-19，手机继续暂停）
+
+**新增范围的本地软件门槛已获独立多agent Review APPROVE；产品整体仍 NOT ACCEPTED，手机测试继续暂停。**
+
+本阶段没有操作手机、真实麦克风或相机，没有真实Mac授权或模型推理。语音优先，按需识图保留；相机误激活为P0。固定产品源码为 `e8a726727f17956f40cdcf05dbcdcd5bc1e6fbb1`，Git内容与冻结测试输入66文件逐项一致，Package.resolved实际pins相同；环境macOS26.6.2、Xcode27.1、Duo iOS27.1模拟器、DAT1.0.1。复用依赖和构建缓存，本轮未称clean build；Duo通过不等于iPhone15ProMax布局通过。 测试和截图已完整导出；末尾额外模拟器诊断采集因子工具找不到simctl（error72）未完成，实际xcodebuild退出0且25/0/0，不把这条诊断当测试通过证据。
+
+当前实际证据：
+
+- 最终UI25：**25 PASS/0 FAIL/0 skip**，含真实SwiftUI的11项播报/键盘路径、照片确认/取消/Stop/原生关闭、触控设置、固定“返回对话”按钮及实际切系统设置再返回。
+- 平台57（Account12、Joint9、Keychain4、Photo19、Speech13）在上一完整运行全部通过；平台编译的生产/测试源与当前冻结版字节相同。Core17、Subscription14亦已实跑，相关源未变。合计113个不同XCTest方法的各自运行覆盖，**不是单次113项或82项全绿运行**。
+- 实际VM **109/109 Flow**、Inputs **25/25**场景通过。109包含旧107，加两项phone Start排队后Stop的拒绝/新启动正例；不重复加总。HTTP36、timing13通过；合成时钟不产生真实模型速度。
+- 40文件静态隐私审查及独立复核通过，源码集合SHA `1a5f32bd3273bdb92e389938699bcf73eaa0693da7584fc9d49708d9d5c8ddca`。它不代替动态日志、SDK内部存储或物理相机证明。SDK正常初始化可能联网；系统语音识别可能使用服务端。
+
+失败历史完整保留：旧状态残留复现；旧完整64为63/1；新联合首轮23/10、第二轮33/2、两项修正后定向2/0；新完整82第一轮79/3、第二轮81/1。后续phone Start防过期修复的UI运行被主动中断，Xcode原始15项13PASS/2FAIL，其中1个实际设置Done无效点击位置、1个Testing was canceled；剩余10项未完成，不能计通过。随后新增独立固定footer返回入口并完整重跑最终UI25，未声称原native Done已修复。键盘/音频警告仍跟踪#13/#21。
+
+原先语音/文字识图指令及照片按钮可直接进入拍照；现在先生成待确认请求；仅本次正向确认能铸造服务层一次性授权，Stop/取消/新输入/语言/退出/离开前台撤销。Inputs只订阅captouch，默认关闭、本人前台待命；暂停/断开不自动重启，照片前先完成Inputs清理。当前实验Inputs能力、固件和真实手势仍未验证，不能用手机按钮或替身当眼镜通过。
+
+Mac独立官方测速入口构建、公开夹具/调度、生命周期14和报告自检已通过，独立Review为READY FOR USER AUTHORIZATION。18输入manifest摘要 `77b5eaa57bf2e91ecd7e9f7ae3834e7684fc0211dc0ca2f8d0f9857d248bc3e5`，来源dirty=true如实保留。真实授权、最多39次模型比较、质量评分、最快模型选择均 **NOT RUN**（#18）。
+
+真实新版OAuth、眼镜双击/HFP/指示灯/新图、真实STT与首音/速度、动态隐私和稳定性均仍待实际验收。手机仍为旧b1c2ea5 / 0.1.0(2)，本轮未安装。逐项证据见[本机回归](local-benchmark-mvp.md)、[执行索引](test-inventory-local-followup-20261019.csv)和[独立Review](test-plan-review-mvp.md)。原始结果、源码归档、截图、摘要及哈希保存在任务outputs/OpenVision-MVP-validation/local-followup-20261019，主issue开放、PR为draft。
+
+
+## 历史暂停检查点（2026-10-19；后续本地状态以上文为准）
 
 用户要出门断开手机，**真机测试已停止，等待本人要求继续**。已安装并实测b1c2ea5，Debug0.1.0(2)：官方授权、目录、显式恢复及2次真实算术回答成功；第二次短中文模式播报由用户确认“有声，没问题”。总手动推理尝试5次（旧版3未完成/调试中断，修复版2完成）；无原始中文长输入或英文/上下文通过证明。
 
 [#16](https://github.com/andywangyzfh/OpenVision/issues/16)缺失MIME问题已修复：局部network36、flow59、Subscription XCTest14、正式iOS构建签名安装通过，独立局部Review批准；没有把旧84项整套结果说成新提交全量复跑。新发现[#17](https://github.com/andywangyzfh/OpenVision/issues/17)播报完成/Stop文案残留；VM修复WIP已落盘、**未做回归/编译，未装到手机**。下一次先补验证再安装。逐项事实、产物hash、未发英文草稿、剩余用例及恢复顺序见[完整检查点](checkpoints/2026-10-19-device-session.md)。真实STT、眼镜与图片仍未验收，整体NOT ACCEPTED，主issue开放/PR为draft。
 
-## 本轮真机与真实账号进度（2026-10-19，产品未验收）
+## 较早真机与真实账号记录（本轮局部修复前；后续检查点优先）
 
 用户完成开发者信任后，真实iPhone15ProMax / iOS27.0.1 (24A446) 上的正式App合成Keychain CRUD、实际AppSupport marker预检及无测试参数正常启动均PASS。签名构建/安装、codesign与手机/Bundle匹配已通过；免费开发配置到2026-10-26，可由Xcode重新签名。安装版本0.1.0 (1)，来源02e40d2（产品等价c5c375b）；可执行文件SHA256为`6228e7b6cfb5042e31bb63eb025019f7c5f91f7ddd1dc0f0c0530ea1ab2f6932`。CI [39221241977](https://github.com/andywangyzfh/OpenVision/actions/runs/39221241977) 在2107e0d成功。
 
