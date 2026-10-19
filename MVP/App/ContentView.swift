@@ -65,7 +65,11 @@ struct MVPContentView: View {
                 Text(model.status).font(.caption).lineLimit(questionFocused ? 2 : nil)
                     .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("conversation.status")
                 HStack {
-                    Button { questionFocused = false; Task { await model.toggleConversation() } } label: {
+                    Button {
+                        let generation = model.voiceActivationGeneration
+                        questionFocused = false
+                        Task { await model.toggleConversation(expectedGeneration: generation) }
+                    } label: {
                         Label(model.conversationActive ? model.text("结束对话", "End conversation") : model.text("开始对话", "Start conversation"), systemImage: "mic")
                     }.buttonStyle(.borderedProminent).disabled(model.busy || model.authorizingSpeech).accessibilityIdentifier("conversation.start")
                     Button(model.text("停止", "Stop")) { questionFocused = false; model.stop() }.buttonStyle(.bordered).accessibilityIdentifier("conversation.stop")

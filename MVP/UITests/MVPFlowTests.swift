@@ -86,6 +86,44 @@ final class MVPFlowTests: XCTestCase {
         XCTFail("Settings button \(identifier) did not exist after at most 6 Form scrolls", file: file, line: line)
         return nil
     }
+
+    @MainActor
+    private func closeSettingsAfterScrolling(in app: XCUIApplication,
+                                             file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let close = app.buttons["完成"]
+        for attempt in 0...6 {
+            let ready = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == true AND hittable == true"), object: close)
+            if XCTWaiter.wait(for: [ready], timeout: 1) == .completed {
+                let before = XCTAttachment(screenshot: app.screenshot())
+                before.name = "Settings Done visible before its single tap"; before.lifetime = .keepAlways; add(before)
+                let visibleControl = XCTAttachment(string: "Done exists=\(close.exists), hittable=\(close.isHittable), frame=\(close.frame)\n\(app.debugDescription)")
+                visibleControl.name = "Settings Done ready state and accessibility hierarchy"; visibleControl.lifetime = .keepAlways; add(visibleControl)
+                close.tap() // One real tap, only after the toolbar control is visible and hittable.
+                let dismissed = XCTNSPredicateExpectation(
+                    predicate: NSPredicate(format: "exists == false"), object: close)
+                if XCTWaiter.wait(for: [dismissed], timeout: 5) == .completed {
+                    let after = XCTAttachment(screenshot: app.screenshot())
+                    after.name = "Settings dismissed after the single Done tap"; after.lifetime = .keepAlways; add(after)
+                    return true
+                }
+                break
+            }
+            guard attempt < 6 else { break }
+            let surface: XCUIElement
+            if app.collectionViews.firstMatch.exists { surface = app.collectionViews.firstMatch }
+            else if app.tables.firstMatch.exists { surface = app.tables.firstMatch }
+            else if app.scrollViews.firstMatch.exists { surface = app.scrollViews.firstMatch }
+            else { break }
+            surface.swipeDown() // Return the lazy Form toward its top; never tap a missing toolbar item.
+        }
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Settings close failed after bounded Form scroll"; screenshot.lifetime = .keepAlways; add(screenshot)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Settings close failure accessibility hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+        XCTFail("Settings Done did not become hittable within 6 downward Form scrolls, or its single tap did not dismiss it", file: file, line: line)
+        return false
+    }
     @MainActor
     func testLanguagePersistsAcrossAppTermination() {
         let app = launch()
@@ -111,7 +149,7 @@ final class MVPFlowTests: XCTestCase {
         app.buttons["settings.open"].tap()
         XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
         guard settingsButton("glasses.camera.authorize", in: app) != nil else { return }
-        app.buttons["完成"].tap()
+        guard closeSettingsAfterScrolling(in: app) else { return }
         // Switching to a real system app exercises lifecycle transitions on runtimes
         // whose synthetic Home key does not leave the foreground (e.g. iPhone Duo).
         let settings = XCUIApplication(bundleIdentifier: "com.apple.Preferences")

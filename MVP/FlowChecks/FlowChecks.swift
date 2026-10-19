@@ -546,6 +546,22 @@ private func photoSafetyScenarios() -> [(String, @MainActor () async throws -> V
         await vm.handleGlassesVoiceToggle(expectedGeneration: acceptedGeneration)
         try expect(vm.speech.authorizationRequests == 1 && vm.speech.isListening && vm.conversationActive, "Own authorization generation was incorrectly compared with the old accepted generation")
     }))
+    result.append(("voice button: queued Start invalidated by Stop never authorizes or listens", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        let clickedGeneration = vm.voiceActivationGeneration
+        vm.stop()
+        await vm.toggleConversation(expectedGeneration: clickedGeneration)
+        try expect(vm.speech.authorizationRequests == 0 && vm.speech.listenAttempts == 0 && vm.speech.listening.isEmpty && !vm.authorizingSpeech && !vm.conversationActive, "A queued Start button operation survived Stop and opened microphone permission or listening")
+    }))
+    result.append(("voice button: fresh Start generation can authorize and listen after Stop", {
+        let (vm, _) = try await setup(); defer { vm.stop() }
+        let oldGeneration = vm.voiceActivationGeneration
+        vm.stop()
+        let freshGeneration = vm.voiceActivationGeneration
+        try expect(freshGeneration != oldGeneration, "Stop did not invalidate the Start button owner")
+        await vm.toggleConversation(expectedGeneration: freshGeneration)
+        try expect(vm.speech.authorizationRequests == 1 && vm.speech.listenAttempts == 1 && vm.speech.isListening && vm.conversationActive && !vm.authorizingSpeech && vm.glasses.captures == 0, "Fresh Start was blocked or opened the camera")
+    }))
     result.append(("photo safety: retained active camera does not claim a new request has not started", {
         let (vm, _) = try await setup(); defer { vm.stop() }
         vm.glasses.cameraActive = true
