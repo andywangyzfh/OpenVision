@@ -33,6 +33,7 @@ final class ConversationViewModel: ObservableObject {
     private var activeForeground = true
     private let preview: Bool
     private var startGeneration = UUID()
+    private var accountActionGeneration = UUID()
     private var accountObserver: AnyCancellable?
 
     init(account: ChatGPTAccountService, preview: Bool = false, sdkAvailable: Bool = false) {
@@ -57,7 +58,7 @@ final class ConversationViewModel: ObservableObject {
         if preview { models = [.init(id: "fixture", name: "Local fixture (no network)")]; modelID = "fixture" }
         accountObserver = account.$isSignedIn.removeDuplicates().sink { [weak self] signedIn in
             Task { @MainActor [weak self] in
-                guard let self, !self.preview else { return }
+                guard let self, !self.preview, signedIn == self.account.isSignedIn else { return }
                 if signedIn { await self.refreshModels() }
                 else { self.stop(); self.models = []; self.modelID = "" }
             }
@@ -82,32 +83,63 @@ final class ConversationViewModel: ObservableObject {
 
     func connectAccount() async {
         guard !signingIn else { return }
+        let generation = UUID(); accountActionGeneration = generation
         signingIn = true
-        defer { signingIn = false }
+        defer { if accountActionGeneration == generation { signingIn = false } }
         do { try await account.signIn() }
-        catch { status = failureMessage(error) }
+        catch {
+            guard accountActionGeneration == generation else { return }
+            status = failureMessage(error)
+        }
+    }
+
+    func restoreAccount() async {
+        guard !signingIn else { return }
+        let generation = UUID(); accountActionGeneration = generation
+        signingIn = true
+        defer { if accountActionGeneration == generation { signingIn = false } }
+        do { try await account.restoreSavedSession() }
+        catch {
+            guard accountActionGeneration == generation else { return }
+            status = account.signOutNotice ?? text("未能恢复本机登录。可重新登录 ChatGPT；如有清理提示，请先重试清理。", "Saved sign-in could not be restored. Sign in to ChatGPT again; retry cleanup if a warning is shown.")
+        }
     }
 
     func refreshModels() async {
         guard account.isSignedIn else { return }
+        let generation = accountActionGeneration
         do {
             let available = try await client.models()
-            guard account.isSignedIn else { return }
+            guard account.isSignedIn, accountActionGeneration == generation else { return }
             models = available
             if !models.contains(where: { $0.id == modelID }) { modelID = models.first?.id ?? "" }
             status = models.isEmpty
                 ? text("账号没有返回可用模型，请检查订阅授权。", "No models were returned. Check your plan authorization.")
-                : text("已连接，使用现有 ChatGPT 额度。", "Connected. Uses your existing ChatGPT plan allowance.")
-        } catch { status = failureMessage(error) }
+                : text("已连接。可在 ChatGPT 设置核对本应用的用量与限额。", "Connected. Review this app's usage and limits in ChatGPT Settings.")
+        } catch {
+            guard account.isSignedIn, accountActionGeneration == generation else { return }
+            status = failureMessage(error)
+        }
     }
 
     func signOut() async {
+        let generation = UUID(); accountActionGeneration = generation
+        signingIn = false
         stop(); history.removeAll(); messages.removeAll()
         models = []; modelID = ""
         await account.signOut()
-        status = account.signOutNotice == nil
-            ? text("已移除本机登录。可在 ChatGPT 设置中检查并撤销连接。", "Local sign-in removed. Review or revoke the connection in ChatGPT Settings.")
-            : text("本机登录已移除，但尚未确认远程撤销。请到 ChatGPT 设置撤销 OpenVision。", "Local sign-in removed; remote revocation was not confirmed. Revoke OpenVision in ChatGPT Settings.")
+        guard accountActionGeneration == generation, !account.isSignedIn, !signingIn else { return }
+        // Preserve the actual cleanup outcome. A failed deletion must never be
+        // rewritten into a reassuring "local credentials removed" message.
+        status = account.signOutNotice ?? text("已移除本机登录。可在 ChatGPT 设置中检查并撤销连接。", "Local sign-in removed. Review or revoke the connection in ChatGPT Settings.")
+    }
+
+    func retryLocalCleanup() async {
+        let generation = UUID(); accountActionGeneration = generation
+        stop()
+        await account.retryLocalCleanup()
+        guard accountActionGeneration == generation, !account.isSignedIn, !signingIn else { return }
+        status = account.signOutNotice ?? text("本机登录已清除。", "Local sign-in removed.")
     }
 
     func toggleConversation() async {
@@ -254,7 +286,11 @@ final class ConversationViewModel: ObservableObject {
     func clear() { stop(); messages.removeAll(); history.removeAll(); status = "" }
     func setForeground(_ active: Bool) {
         activeForeground = active
-        if !active { stop(); account.cancelSignIn(); status = text("已暂停。回到 App 后点击开始。", "Paused. Tap Start when you return.") }
+        if !active {
+            accountActionGeneration = UUID(); signingIn = false
+            stop(); account.cancelSignIn()
+            status = text("已暂停。回到 App 后点击开始。", "Paused. Tap Start when you return.")
+        }
     }
 }
 

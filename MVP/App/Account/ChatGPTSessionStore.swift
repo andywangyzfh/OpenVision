@@ -8,23 +8,58 @@ actor ChatGPTSessionStore {
     private var refreshTask: Task<PlanCredentials, Error>?
     private var refreshID: UUID?
     private var generation = 0
+    private var localCleanup: LocalCredentialCleanup = .notChecked
+    private var remoteRevocation: RemoteRevocationStatus = .unconfirmed
     typealias RefreshOperation = @Sendable (PlanCredentials) async throws -> PlanCredentials
     typealias RevocationOperation = @Sendable (PlanCredentials) async -> Bool
     private let storage: any PlanCredentialStorage
     private let refreshOperation: RefreshOperation
     private let revocationOperation: RevocationOperation
-    init(storage: any PlanCredentialStorage = KeychainPlanCredentialStorage(),
+    init(storage: any PlanCredentialStorage = ProtectedPlanCredentialStorage.production(),
          refreshOperation: @escaping RefreshOperation = { try await ChatGPTSessionStore.refreshSession($0) },
          revocationOperation: @escaping RevocationOperation = { await ChatGPTSessionStore.revokeSession($0) }) {
         self.storage = storage; self.refreshOperation = refreshOperation; self.revocationOperation = revocationOperation
-        credentials = try? storage.load()
     }
     func snapshot() -> PlanCredentials? { credentials }
-    func save(_ value: PlanCredentials) throws {
-        try storage.save(value)
+    func cleanupState() -> LocalCredentialCleanup { localCleanup }
+    func uiState() -> PlanAccountUIState { PlanAccountUIState(credentials: credentials, cleanup: localCleanup, epoch: generation) }
+    func authorizationEpoch() -> Int { generation }
+    /// A user action, never a launch/initialization hook. A stale queued restore cannot read or
+    /// reactivate a record after sign-out or a newer OAuth commit.
+    func resumeSavedCredentials(expectedEpoch: Int, authorization: PlanAuthorizationPermit) throws -> PlanAccountUIState {
+        try Task.checkCancellation()
+        guard expectedEpoch == generation else { throw CancellationError() }
+        guard credentials == nil else { throw PlanError.service("already_signed_in") }
+        try authorization.commit {
+            refreshTask?.cancel(); refreshTask = nil; refreshID = nil
+            remoteRevocation = .unconfirmed
+            do { credentials = try storage.load(); localCleanup = .removed }
+            catch {
+                credentials = nil
+                localCleanup = (error as? CredentialCleanupError)?.state ?? .unsafeFailure(nil)
+            }
+            generation += 1
+        }
+        return uiState()
+    }
+    func save(_ value: PlanCredentials, expectedEpoch: Int? = nil, authorization: PlanAuthorizationPermit? = nil) throws {
+        try Task.checkCancellation()
+        if let expectedEpoch, expectedEpoch != generation { throw CancellationError() }
+        if let authorization {
+            try authorization.commit {
+                // A partially saved new server session cannot inherit a prior session's revoke
+                // confirmation, even if its final restoration-grant transaction fails.
+                remoteRevocation = .unconfirmed
+                try storage.save(value)
+            }
+        } else {
+            remoteRevocation = .unconfirmed
+            try storage.save(value)
+        }
         refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         generation += 1
         credentials = value
+        localCleanup = .removed
     }
     func accessToken(forceRefresh: Bool = false) async throws -> String {
         try Task.checkCancellation()
@@ -73,22 +108,41 @@ actor ChatGPTSessionStore {
         generation += 1
         refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         credentials = nil
-        storage.clear()
+        localCleanup = clearLocalCredentials()
         NotificationCenter.default.post(name: .chatGPTReauthenticationRequired, object: nil)
     }
-    func discardIfMatching(_ token: String) {
+    func discardIfMatching(_ token: String, expectedEpoch: Int? = nil) {
+        if let expectedEpoch, expectedEpoch != generation { return }
         guard credentials?.accessToken == token else { return }
         invalidate()
     }
-    /// Stop requests first. A failed remote revoke still clears local credentials.
-    func signOut() async -> Bool {
+    /// Stop requests first. Local deletion and remote revocation are independent results.
+    func signOut() async -> SessionSignOutResult {
         generation += 1
         refreshTask?.cancel(); refreshTask = nil; refreshID = nil
         let old = credentials
         credentials = nil
-        storage.clear()
-        guard let old else { return true }
-        return await revocationOperation(old)
+        localCleanup = clearLocalCredentials()
+        let local = localCleanup
+        let expectedGeneration = generation
+        let revoked: RemoteRevocationStatus
+        if let old {
+            if old.refreshToken?.isEmpty != false { revoked = .notNeeded }
+            else { revoked = await revocationOperation(old) ? .confirmed : .unconfirmed }
+        } else { revoked = remoteRevocation }
+        if generation == expectedGeneration { remoteRevocation = revoked }
+        return SessionSignOutResult(local: local, remote: revoked)
+    }
+    /// Retry only a prior signed-out cleanup. It must never remove a newly signed-in account.
+    func retryLocalCleanup() -> SessionSignOutResult {
+        guard credentials == nil else { return SessionSignOutResult(local: .removed, remote: .notNeeded) }
+        localCleanup = clearLocalCredentials()
+        return SessionSignOutResult(local: localCleanup, remote: remoteRevocation)
+    }
+    private func clearLocalCredentials() -> LocalCredentialCleanup {
+        do { try storage.clear(); return .removed }
+        catch let error as CredentialCleanupError { return error.state }
+        catch { return .unsafeFailure((error as? KeychainDeletionError)?.status) }
     }
     static func refreshSession(_ current: PlanCredentials) async throws -> PlanCredentials {
         guard let token = current.refreshToken, !token.isEmpty else { throw PlanError.reauthenticationRequired }
@@ -97,7 +151,7 @@ actor ChatGPTSessionStore {
         return try await refreshed(current, reply: result)
     }
     static func revokeSession(_ old: PlanCredentials) async -> Bool {
-        guard let refreshToken = old.refreshToken else { return true }
+        guard let refreshToken = old.refreshToken, !refreshToken.isEmpty else { return false }
         do {
             guard let endpoint = try await IDTokenVerifier.discovery().revocation_endpoint else { return false }
             var request = URLRequest(url: endpoint)

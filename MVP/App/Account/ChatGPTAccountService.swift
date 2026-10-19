@@ -10,49 +10,143 @@ final class ChatGPTAccountService: NSObject, ObservableObject, ASWebAuthenticati
     @Published private(set) var accountLabel = ""
     @Published private(set) var signOutNotice: String?
     @Published private(set) var isSigningIn = false
+    @Published private(set) var localCleanupState: LocalCredentialCleanup = .notChecked
     private var session: ASWebAuthenticationSession?
     private var listener: PlanLoopbackListener?
     private var pending: PlanCallbackWaiter?
     private var timeout: Task<Void, Never>?
     private var invalidationObserver: NSObjectProtocol?
     private var signInGeneration = 0
-
-    init(restoreSession: Bool = true) {
-        super.init()
-        invalidationObserver = NotificationCenter.default.addObserver(forName: .chatGPTReauthenticationRequired, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.isSignedIn = false; self?.accountLabel = "" }
+    private var authorizationPermit: PlanAuthorizationPermit?
+    private let dependencies: AccountCoordinatorDependencies
+    private var store: ChatGPTSessionStore { dependencies.store() }
+    private var identityUIRevision = 0
+    var needsLocalCleanupRetry: Bool {
+        switch localCleanupState {
+        case .blockedPendingDeletion, .unsafeFailure: return true
+        case .removed, .notChecked: return false
         }
-        guard restoreSession else { return }
-        Task {
-            if let value = await ChatGPTSessionStore.shared.snapshot() {
-                guard signInGeneration == 0 else { return }
-                isSignedIn = true; accountLabel = value.label
+    }
+
+    init(dependencies: AccountCoordinatorDependencies? = nil) {
+        self.dependencies = dependencies ?? .live()
+        super.init()
+        invalidationObserver = self.dependencies.notifications.addObserver(forName: .chatGPTReauthenticationRequired, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let expectedGeneration = self.signInGeneration
+                let expectedUIRevision = self.identityUIRevision
+                let state = await self.store.uiState()
+                guard self.signInGeneration == expectedGeneration, self.identityUIRevision == expectedUIRevision else { return }
+                self.localCleanupState = state.cleanup
+                // A late notification must neither activate saved credentials nor clear a newer
+                // completed login. Always reconcile with the current atomic Store snapshot.
+                if let value = state.credentials {
+                    if self.isSignedIn { self.accountLabel = value.label }
+                } else {
+                    self.isSignedIn = false; self.accountLabel = ""
+                }
+                self.identityUIRevision += 1
+                if self.needsLocalCleanupRetry {
+                    self.signOutNotice = Self.notice(for: SessionSignOutResult(local: state.cleanup, remote: .unconfirmed))
+                }
             }
         }
+        // No startup read/probe, including when an old credential cannot be deleted. A saved
+        // sign-in is considered only after the user explicitly calls restoreSavedSession().
+    }
+
+    func restoreSavedSession() async throws {
+        guard !isSigningIn else { throw PlanError.service("sign_in_in_progress") }
+        signInGeneration += 1
+        let expectedGeneration = signInGeneration
+        let permit = PlanAuthorizationPermit()
+        authorizationPermit = permit; isSigningIn = true
+        defer {
+            permit.cancel()
+            if signInGeneration == expectedGeneration { isSigningIn = false; cleanup() }
+        }
+        let epoch = await store.authorizationEpoch()
+        try ensureCurrent(expectedGeneration)
+        let state = try await store.resumeSavedCredentials(expectedEpoch: epoch, authorization: permit)
+        do { try ensureCurrent(expectedGeneration) }
+        catch {
+            if let value = state.credentials {
+                await store.discardIfMatching(value.accessToken, expectedEpoch: state.epoch)
+            }
+            throw error
+        }
+        localCleanupState = state.cleanup; identityUIRevision += 1
+        guard let value = state.credentials else {
+            signOutNotice = needsLocalCleanupRetry
+                ? Self.notice(for: SessionSignOutResult(local: state.cleanup, remote: .unconfirmed))
+                : "没有可恢复的本机登录，请重新登录。\nNo saved sign-in is available. Sign in again."
+            throw PlanError.service("no_saved_session")
+        }
+        isSignedIn = true; accountLabel = value.label
+        signOutNotice = nil
     }
 
     func signIn() async throws {
         guard !isSigningIn else { throw PlanError.service("sign_in_in_progress") }
         signInGeneration += 1
         let expectedGeneration = signInGeneration
+        let permit = PlanAuthorizationPermit()
+        authorizationPermit = permit
         isSigningIn = true
         defer {
+            permit.cancel()
             if signInGeneration == expectedGeneration { isSigningIn = false; cleanup() }
         }
+        let commitEpoch = await store.authorizationEpoch()
+        try ensureCurrent(expectedGeneration)
         let hostID: String
-        if let saved = try KeychainRecord.read(String.self, key: "host-id-v1") { hostID = saved }
+        if let saved = try dependencies.metadata.hostID() { hostID = saved }
         else {
             hostID = "urn:uuid:" + UUID().uuidString.lowercased()
-            try KeychainRecord.write(hostID, key: "host-id-v1")
+            try dependencies.metadata.saveHostID(hostID)
         }
-        let previous = try KeychainRecord.read(PlanRegistration.self, key: "chatgpt-registration-v1")
-        let unfinished = try KeychainRecord.read(PendingPlanRegistration.self, key: "chatgpt-pending-registration-v1")
+        let previous = try dependencies.metadata.registration()
+        let unfinished = try dependencies.metadata.pendingRegistration()
+        let response: AccountAuthorizationResponse
+        if let authorization = dependencies.authorization {
+            response = try await authorization(hostID, previous?.clientID ?? unfinished?.clientID)
+        } else {
+            response = try await receiveAuthorization(hostID: hostID, clientID: previous?.clientID ?? unfinished?.clientID, expectedGeneration: expectedGeneration)
+        }
+        let attempt = response.attempt
+        let query = response.query
+        try ensureCurrent(expectedGeneration)
+        let callback = try attempt.callback(query)
+        // Retain the issued client before exchange so invalid_grant recovery reuses registration.
+        // This is pending registration metadata, not a verified identity or an active account.
+        try dependencies.metadata.savePendingRegistration(PendingPlanRegistration(clientID: callback.clientID))
+        let reply = try await dependencies.tokenRequest(["grant_type": "authorization_code", "client_id": callback.clientID,
+            "code": callback.code, "code_verifier": attempt.verifier, "redirect_uri": attempt.redirectURI,
+            "resource": SubscriptionContract.resource])
+        try ensureCurrent(expectedGeneration)
+        let credentials = try await dependencies.validated(reply, callback.clientID, attempt.nonce)
+        try ensureCurrent(expectedGeneration)
+        if let previous, previous.subject != credentials.subject { throw PlanError.invalidIdentity }
+        try dependencies.metadata.saveRegistration(PlanRegistration(clientID: credentials.clientID, subject: credentials.subject))
+        try Task.checkCancellation()
+        try await store.save(credentials, expectedEpoch: commitEpoch, authorization: permit)
+        do { try ensureCurrent(expectedGeneration) }
+        catch {
+            await store.discardIfMatching(credentials.accessToken, expectedEpoch: commitEpoch + 1)
+            throw error
+        }
+        isSignedIn = true; accountLabel = credentials.label; identityUIRevision += 1; signOutNotice = nil; localCleanupState = .removed
+        // Pending registration contains no secrets; a retained copy is safe to reuse.
+        try? dependencies.metadata.clearPendingRegistration()
+    }
+
+    private func receiveAuthorization(hostID: String, clientID: String?, expectedGeneration: Int) async throws -> AccountAuthorizationResponse {
         let listener = try PlanLoopbackListener()
         self.listener = listener
-        defer { listener.stop() }
         let port = try await listener.start()
         try ensureCurrent(expectedGeneration)
-        let attempt = SignInAttempt(hostID: hostID, port: port, clientID: previous?.clientID ?? unfinished?.clientID)
+        let attempt = SignInAttempt(hostID: hostID, port: port, clientID: clientID)
         listener.expectedState = attempt.state
         let waiter = PlanCallbackWaiter()
         pending = waiter
@@ -73,33 +167,13 @@ final class ChatGPTAccountService: NSObject, ObservableObject, ASWebAuthenticati
         let query = try await withTaskCancellationHandler(operation: { try await waiter.result() }, onCancel: {
             waiter.complete(.failure(CancellationError()))
         })
-        try ensureCurrent(expectedGeneration)
-        let callback = try attempt.callback(query)
-        // Retain the issued client before exchange so invalid_grant recovery reuses registration.
-        // This is pending registration metadata, not a verified identity or an active account.
-        try KeychainRecord.write(PendingPlanRegistration(clientID: callback.clientID), key: "chatgpt-pending-registration-v1")
-        let reply = try await ChatGPTSessionStore.tokenRequest(["grant_type": "authorization_code", "client_id": callback.clientID,
-            "code": callback.code, "code_verifier": attempt.verifier, "redirect_uri": attempt.redirectURI,
-            "resource": SubscriptionContract.resource])
-        try ensureCurrent(expectedGeneration)
-        let credentials = try await ChatGPTSessionStore.validated(reply, clientID: callback.clientID, nonce: attempt.nonce)
-        try ensureCurrent(expectedGeneration)
-        if let previous, previous.subject != credentials.subject { throw PlanError.invalidIdentity }
-        try KeychainRecord.write(PlanRegistration(clientID: credentials.clientID, subject: credentials.subject), key: "chatgpt-registration-v1")
-        try Task.checkCancellation()
-        try await ChatGPTSessionStore.shared.save(credentials)
-        do { try ensureCurrent(expectedGeneration) }
-        catch {
-            await ChatGPTSessionStore.shared.discardIfMatching(credentials.accessToken)
-            throw error
-        }
-        isSignedIn = true; accountLabel = credentials.label; signOutNotice = nil
-        KeychainRecord.delete(key: "chatgpt-pending-registration-v1")
+        return AccountAuthorizationResponse(attempt: attempt, query: query)
     }
 
     /// Called when the user cancels or the app leaves the active foreground.
     func cancelSignIn() {
         signInGeneration += 1
+        authorizationPermit?.cancel(); authorizationPermit = nil
         isSigningIn = false
         pending?.complete(.failure(PlanError.denied))
         cleanup()
@@ -114,21 +188,51 @@ final class ChatGPTAccountService: NSObject, ObservableObject, ASWebAuthenticati
         cancelSignIn()
         isSignedIn = false; accountLabel = ""
         let expectedGeneration = signInGeneration
-        let revoked = await ChatGPTSessionStore.shared.signOut()
+        let result = await store.signOut()
         guard signInGeneration == expectedGeneration else { return }
-        signOutNotice = revoked ? nil : "Local credentials were removed. Remote revocation was not confirmed; disconnect OpenVision in ChatGPT Settings."
+        localCleanupState = result.local; identityUIRevision += 1
+        signOutNotice = Self.notice(for: result)
+    }
+
+    func retryLocalCleanup() async {
+        let expectedGeneration = signInGeneration
+        let result = await store.retryLocalCleanup()
+        guard signInGeneration == expectedGeneration else { return }
+        localCleanupState = result.local; identityUIRevision += 1
+        signOutNotice = Self.notice(for: result)
+    }
+
+    private static func notice(for result: SessionSignOutResult) -> String? {
+        guard !result.complete else { return nil }
+        let local: String
+        switch result.local {
+        case .notChecked:
+            local = "尚未检查本机保存的登录。\nSaved local credentials have not been inspected."
+        case .removed:
+            local = "本机凭据已删除。\nLocal credentials were deleted."
+        case .blockedPendingDeletion:
+            local = "本机凭据删除失败，已持久阻止重新启动恢复。请重试本机清理。\nLocal credential deletion failed. A persistent block prevents restoration after restart. Retry local cleanup."
+        case .unsafeFailure:
+            local = "凭据删除与持久禁用未确认，不能视为记录已清除；请重试清理。\nLocal credential deletion and persistent disablement were not confirmed. Do not treat the record as erased; retry local cleanup."
+        }
+        let remote: String
+        switch result.remote {
+        case .confirmed: remote = "远程撤销已确认。\nRemote revocation was confirmed."
+        case .notNeeded: remote = "此登录没有可撤销的续期令牌，未执行远程撤销。\nNo renewable token was available; no remote revocation request was made."
+        case .unconfirmed: remote = "远程撤销尚未确认，请在 ChatGPT 设置中断开 OpenVision。\nRemote revocation was not confirmed. Disconnect OpenVision in ChatGPT Settings."
+        }
+        return local + "\n" + remote
     }
 
     private func cleanup() {
+        dependencies.cancelAuthorization()
         timeout?.cancel(); timeout = nil
         listener?.stop(); listener = nil
         session?.cancel(); session = nil
         pending = nil
+        authorizationPermit = nil
     }
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first(where: \.isKeyWindow) ?? ASPresentationAnchor()
     }
 }
-
-private struct PlanRegistration: Codable { let clientID: String; let subject: String }
-private struct PendingPlanRegistration: Codable { let clientID: String }

@@ -275,6 +275,54 @@ struct FlowChecks {
         }
         defer { restoreDefaults() }
         let scenarios: [(String, @MainActor () async throws -> Void)] = [
+            ("background cancels sign-in UI and an old completion cannot clear a new attempt", {
+                let (vm, _) = try await setup(); defer { vm.stop() }
+                await vm.signOut(); await drain()
+                vm.account.holdSignIn = true
+                let oldAttempt = Task { await vm.connectAccount() }
+                try await eventually("first sign-in waiting") { vm.account.pendingSignIns.count == 1 }
+                vm.setForeground(false); vm.setForeground(true)
+                try expect(!vm.signingIn && !vm.ready, "Background left the old sign-in UI locked")
+                let newAttempt = Task { await vm.connectAccount() }
+                try await eventually("new sign-in waiting") { vm.account.pendingSignIns.count == 2 }
+                vm.account.finishSignIn(at: 0); await oldAttempt.value
+                try expect(vm.signingIn && !vm.ready, "Old sign-in completion cleared the current attempt")
+                vm.account.finishSignIn(at: 0); await newAttempt.value; await drain()
+                try expect(!vm.signingIn && vm.ready && !vm.models.isEmpty, "Explicit new sign-in could not recover")
+            }),
+            ("late sign-out cannot overwrite the newly connected account status", {
+                let (vm, _) = try await setup(); defer { vm.stop() }
+                vm.account.holdSignOut = true
+                let oldSignOut = Task { await vm.signOut() }
+                try await eventually("sign-out waiting for remote result") { vm.account.pendingSignOut != nil }
+                await vm.connectAccount(); await drain()
+                let connectedStatus = vm.status
+                try expect(vm.account.isSignedIn && !vm.models.isEmpty, "New account did not connect")
+                vm.account.finishSignOut(); await oldSignOut.value; await drain()
+                try expect(vm.status == connectedStatus && vm.account.isSignedIn, "Old sign-out overwrote the new account status")
+            }),
+            ("late cleanup retry cannot overwrite the newly connected account status", {
+                let (vm, _) = try await setup(); defer { vm.stop() }
+                await vm.signOut(); await drain()
+                vm.account.holdCleanupRetry = true
+                let oldCleanup = Task { await vm.retryLocalCleanup() }
+                try await eventually("cleanup waiting for storage") { vm.account.pendingCleanup != nil }
+                await vm.connectAccount(); await drain()
+                let connectedStatus = vm.status
+                vm.account.finishCleanup(); await oldCleanup.value; await drain()
+                try expect(vm.status == connectedStatus && vm.account.isSignedIn, "Old cleanup overwrote the new account status")
+            }),
+            ("sign-out preserves unsafe cleanup notice instead of claiming credentials were removed", {
+                for language in ConversationLanguage.allCases {
+                    let (vm, _) = try await setup(); defer { vm.stop() }
+                    vm.language = language
+                    let notice = "未能确认本机凭据清理；请重试。 / Local credential cleanup was not confirmed; retry."
+                    vm.account.signOutNotice = notice
+                    await vm.signOut(); await drain()
+                    try expect(vm.status == notice && !vm.ready && vm.messages.isEmpty && vm.models.isEmpty,
+                               "The actual failed-cleanup warning was replaced by a successful-removal claim")
+                }
+            }),
             ("restored account loads its model catalog", {
                 let (vm, world) = try await setup(signedIn: false)
                 defer { vm.stop() }

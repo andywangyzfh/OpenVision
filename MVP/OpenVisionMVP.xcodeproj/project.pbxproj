@@ -11,6 +11,7 @@
 		06D04DDB98EF3BC379BEB94F /* OpenVisionCore in Frameworks */ = {isa = PBXBuildFile; productRef = 88966C0F474379C7F400BE96 /* OpenVisionCore */; };
 		0CE9FD075E3B0C546B0D25E5 /* ChatGPTPlanClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EFA66F1F5BE6BC1BCB8E3A /* ChatGPTPlanClient.swift */; };
 		10346EBB7843649DD9EED220 /* SubscriptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1FF8435369AE7F3174143341 /* SubscriptionCore */; };
+		131C76A1D29B34520A0E9B48 /* AccountCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 771ED5A8AD59F647FCD7B74B /* AccountCoordinatorTests.swift */; };
 		158B5C8CD631FBAE8025FA7E /* OpenVisionCore in Frameworks */ = {isa = PBXBuildFile; productRef = 01C615AEE8D5A9AEEC556F20 /* OpenVisionCore */; };
 		164FB1800D9D1A834DDDF908 /* ChatGPTSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB58F81914B19E854E5281F7 /* ChatGPTSessionStore.swift */; };
 		175DAA6D294A3C0281A56EEF /* PlanAuthCallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA39192B428433EB81A94DD7 /* PlanAuthCallback.swift */; };
@@ -21,10 +22,13 @@
 		46BAC1F7491997B0924BA6E6 /* PhotoServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BCFDC42FCECB403554C955D /* PhotoServiceTests.swift */; };
 		4E69F593D8D34A6D6287BF50 /* TestHostApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32140F24CA050E89EE9D31C /* TestHostApp.swift */; };
 		50540F8811140E22B83406A9 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = 6ECCC4BB99454AD5A1C6AB38 /* MWDATCamera */; };
+		5341A41AB4352BCFECCB3B44 /* ChatGPTAccountService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */; };
 		606133581EF7617D9E3D8988 /* SpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00C87770A63FF9D18C046BDB /* SpeechService.swift */; };
 		60BD1F21597574363B031D2D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F004EA4E917AF1EAA0C649 /* ContentView.swift */; };
 		6DBE984BB58E887DCEC805F1 /* ChatGPTAccountService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */; };
+		799FF8E990D145ED4A104DE8 /* AccountCoordinatorDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A633C8124716B5E570422E /* AccountCoordinatorDependencies.swift */; };
 		7B9050DE255B4A0F0462E557 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = D802FDB72002C03E3BC2129D /* MWDATCore */; };
+		7DE24781361C364184A1EA26 /* AccountCoordinatorDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A633C8124716B5E570422E /* AccountCoordinatorDependencies.swift */; };
 		7EF72E23A8B0F0F2D882536E /* SpeechDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B92AFE7486E68E8E974E3D /* SpeechDriver.swift */; };
 		90991D22B1EED8F773ACEB5C /* ChatGPTSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB58F81914B19E854E5281F7 /* ChatGPTSessionStore.swift */; };
 		96E989B69871659CA97AB519 /* MVPFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA4AD53B890DDCFE01B81D4 /* MVPFlowTests.swift */; };
@@ -34,11 +38,13 @@
 		AE79BEA64E1DDFBDA3770BAF /* PlanCredentialStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E1809BB5CF2F7A88C57210 /* PlanCredentialStorage.swift */; };
 		AF54FFD30E12F6946805B85D /* GlassesPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53D2D738463E55C65525815B /* GlassesPhotoService.swift */; };
 		B70B415D6EE105DFF261393B /* SubscriptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = B4B8D4A2B121696A28891FDF /* SubscriptionCore */; };
+		C20CBC76926BD3ADB407BFEB /* ProductionKeychainPreflight.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C0C8FB8D200BB50AE40C2C /* ProductionKeychainPreflight.swift */; };
 		C929053E13062B518411C109 /* DATCameraDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F620718991E6A0B35BC6884 /* DATCameraDriver.swift */; };
 		D31C32FC356A4524976B5781 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = C821CD0020A5847A2777DC03 /* MWDATCore */; };
 		D6CB3A46287BC43F4081B7D9 /* SpeechDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B92AFE7486E68E8E974E3D /* SpeechDriver.swift */; };
 		E79309BE642DD80E63934159 /* OpenVisionMVPApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EB03B328D3F7D0454691676 /* OpenVisionMVPApp.swift */; };
 		F0C651243ACC1405A1EDF031 /* PlanCredentialStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E1809BB5CF2F7A88C57210 /* PlanCredentialStorage.swift */; };
+		FF9D6F968083650A3829C11F /* PlanAuthCallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA39192B428433EB81A94DD7 /* PlanAuthCallback.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,15 +78,18 @@
 		54B92AFE7486E68E8E974E3D /* SpeechDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechDriver.swift; sourceTree = "<group>"; };
 		6F620718991E6A0B35BC6884 /* DATCameraDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DATCameraDriver.swift; sourceTree = "<group>"; };
 		7547994D7C92B486BDB05A28 /* Core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Core; path = Core; sourceTree = SOURCE_ROOT; };
+		771ED5A8AD59F647FCD7B74B /* AccountCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCoordinatorTests.swift; sourceTree = "<group>"; };
 		82A1D9160CA8E94DA4B01AD5 /* OpenVisionMVPPlatformTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenVisionMVPPlatformTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		9006AFA19A1993A3227CF96D /* OpenVisionMVP.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenVisionMVP.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		90F004EA4E917AF1EAA0C649 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		991F0934676E33F0AE6C2C53 /* SpeechServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechServiceTests.swift; sourceTree = "<group>"; };
 		A32140F24CA050E89EE9D31C /* TestHostApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHostApp.swift; sourceTree = "<group>"; };
+		A3C0C8FB8D200BB50AE40C2C /* ProductionKeychainPreflight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionKeychainPreflight.swift; sourceTree = "<group>"; };
 		AA39192B428433EB81A94DD7 /* PlanAuthCallback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanAuthCallback.swift; sourceTree = "<group>"; };
 		B4555963A1FC7F3FFFD13FF6 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTAccountService.swift; sourceTree = "<group>"; };
 		CA24CD927CC2B5236ED065FF /* Simulator.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Simulator.entitlements; sourceTree = "<group>"; };
+		D5A633C8124716B5E570422E /* AccountCoordinatorDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCoordinatorDependencies.swift; sourceTree = "<group>"; };
 		E7F935363771A343E3E36A08 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		E9DD6BB35A33AA4F52EC7F7C /* OpenVisionMVPUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = OpenVisionMVPUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ECB2C6A9DF25272B9A95EB32 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
@@ -116,6 +125,7 @@
 		03021EF36ED4EC83242AFF01 /* PlatformTests */ = {
 			isa = PBXGroup;
 			children = (
+				771ED5A8AD59F647FCD7B74B /* AccountCoordinatorTests.swift */,
 				ECB2C6A9DF25272B9A95EB32 /* KeychainStoreTests.swift */,
 				4BCFDC42FCECB403554C955D /* PhotoServiceTests.swift */,
 				991F0934676E33F0AE6C2C53 /* SpeechServiceTests.swift */,
@@ -126,6 +136,7 @@
 		299AAD71AB2C853246B5362F /* Account */ = {
 			isa = PBXGroup;
 			children = (
+				D5A633C8124716B5E570422E /* AccountCoordinatorDependencies.swift */,
 				C8B4BA4EF19E9C1CF80C2568 /* ChatGPTAccountService.swift */,
 				20EFA66F1F5BE6BC1BCB8E3A /* ChatGPTPlanClient.swift */,
 				FB58F81914B19E854E5281F7 /* ChatGPTSessionStore.swift */,
@@ -188,6 +199,7 @@
 				6F620718991E6A0B35BC6884 /* DATCameraDriver.swift */,
 				53D2D738463E55C65525815B /* GlassesPhotoService.swift */,
 				3EB03B328D3F7D0454691676 /* OpenVisionMVPApp.swift */,
+				A3C0C8FB8D200BB50AE40C2C /* ProductionKeychainPreflight.swift */,
 				54B92AFE7486E68E8E974E3D /* SpeechDriver.swift */,
 				00C87770A63FF9D18C046BDB /* SpeechService.swift */,
 				299AAD71AB2C853246B5362F /* Account */,
@@ -364,6 +376,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7DE24781361C364184A1EA26 /* AccountCoordinatorDependencies.swift in Sources */,
 				6DBE984BB58E887DCEC805F1 /* ChatGPTAccountService.swift in Sources */,
 				0CE9FD075E3B0C546B0D25E5 /* ChatGPTPlanClient.swift in Sources */,
 				90991D22B1EED8F773ACEB5C /* ChatGPTSessionStore.swift in Sources */,
@@ -374,6 +387,7 @@
 				E79309BE642DD80E63934159 /* OpenVisionMVPApp.swift in Sources */,
 				175DAA6D294A3C0281A56EEF /* PlanAuthCallback.swift in Sources */,
 				F0C651243ACC1405A1EDF031 /* PlanCredentialStorage.swift in Sources */,
+				C20CBC76926BD3ADB407BFEB /* ProductionKeychainPreflight.swift in Sources */,
 				D6CB3A46287BC43F4081B7D9 /* SpeechDriver.swift in Sources */,
 				188FF933030E40FA7C38D872 /* SpeechService.swift in Sources */,
 			);
@@ -383,11 +397,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				799FF8E990D145ED4A104DE8 /* AccountCoordinatorDependencies.swift in Sources */,
+				131C76A1D29B34520A0E9B48 /* AccountCoordinatorTests.swift in Sources */,
+				5341A41AB4352BCFECCB3B44 /* ChatGPTAccountService.swift in Sources */,
 				164FB1800D9D1A834DDDF908 /* ChatGPTSessionStore.swift in Sources */,
 				37859C8D8F1B90F594B39AE0 /* DATCameraDriver.swift in Sources */,
 				9FD8076C23D529A2772D51C3 /* GlassesPhotoService.swift in Sources */,
 				0380D94B3D3BDA23EA360B78 /* KeychainStoreTests.swift in Sources */,
 				46BAC1F7491997B0924BA6E6 /* PhotoServiceTests.swift in Sources */,
+				FF9D6F968083650A3829C11F /* PlanAuthCallback.swift in Sources */,
 				AE79BEA64E1DDFBDA3770BAF /* PlanCredentialStorage.swift in Sources */,
 				7EF72E23A8B0F0F2D882536E /* SpeechDriver.swift in Sources */,
 				606133581EF7617D9E3D8988 /* SpeechService.swift in Sources */,

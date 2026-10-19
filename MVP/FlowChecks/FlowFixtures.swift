@@ -60,14 +60,35 @@ final class ChatGPTAccountService: ObservableObject {
     var cancelledSignIns = 0
     var signInCalls = 0
     var signInError: PlanError?
+    var holdSignIn = false
+    var pendingSignIns: [CheckedContinuation<Void, Never>] = []
+    private var signInGeneration = 0
+    var holdSignOut = false
+    var holdCleanupRetry = false
+    var pendingSignOut: CheckedContinuation<Void, Never>?
+    var pendingCleanup: CheckedContinuation<Void, Never>?
     func restoreSignedIn() { isSignedIn = true }
+    func restoreSavedSession() async throws { try await signIn() }
     func signIn() async throws {
         signInCalls += 1
+        signInGeneration += 1
+        let generation = signInGeneration
+        if holdSignIn { await withCheckedContinuation { pendingSignIns.append($0) } }
+        guard generation == signInGeneration else { throw CancellationError() }
         if let error = signInError { throw error }
         isSignedIn = true
     }
-    func signOut() async { isSignedIn = false }
-    func cancelSignIn() { cancelledSignIns += 1 }
+    func signOut() async {
+        isSignedIn = false
+        if holdSignOut { await withCheckedContinuation { pendingSignOut = $0 } }
+    }
+    func retryLocalCleanup() async {
+        if holdCleanupRetry { await withCheckedContinuation { pendingCleanup = $0 } }
+    }
+    func finishSignOut() { let pending = pendingSignOut; pendingSignOut = nil; pending?.resume() }
+    func finishCleanup() { let pending = pendingCleanup; pendingCleanup = nil; pending?.resume() }
+    func finishSignIn(at index: Int) { pendingSignIns.remove(at: index).resume() }
+    func cancelSignIn() { cancelledSignIns += 1; signInGeneration += 1 }
 }
 
 @MainActor

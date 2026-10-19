@@ -93,10 +93,17 @@ struct MVPContentView: View {
                         }
                         Button(model.text("退出登录", "Sign out"), role: .destructive) { Task { await model.signOut() } }
                     } else {
+                        Button(model.text("恢复本机已有登录", "Restore saved sign-in")) { Task { await model.restoreAccount() } }.disabled(model.signingIn).accessibilityIdentifier("account.restore")
                         Button("Continue with ChatGPT") { Task { await model.connectAccount() } }.disabled(model.signingIn)
                     }
+                    if account.needsLocalCleanupRetry {
+                        Button(model.text("重试清理本机登录", "Retry local sign-in cleanup")) {
+                            Task { await model.retryLocalCleanup() }
+                        }.disabled(model.signingIn)
+                    }
+                    if let notice = account.signOutNotice { Text(notice).font(.caption) }
                     Link(model.text("管理订阅用量及应用连接", "Manage plan usage and app connections"), destination: URL(string: "https://chatgpt.com/#settings/Usage")!)
-                    Text(model.text("使用现有订阅额度；不会自动切换到付费 API。", "Uses your existing plan allowance. No automatic paid API fallback.")).font(.caption)
+                    Text(model.text("请在授权与用量页核对套餐及已有 credits 的使用设置。不会自动切换到其他 API 后端。", "Review plan and available-credit usage in the authorization and usage pages. No automatic switch to another API backend.")).font(.caption)
                 }
                 Section(model.text("眼镜", "Glasses")) {
                     Button(model.text("连接／注册眼镜", "Connect / register glasses")) { setup { try await glasses.register() } }

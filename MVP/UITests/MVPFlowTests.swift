@@ -2,6 +2,56 @@ import XCTest
 
 final class MVPFlowTests: XCTestCase {
     @MainActor
+    func testNormalProductionColdStartRequiresExplicitAccountAction() {
+        let app = XCUIApplication()
+        app.launchArguments = []
+        app.launch()
+        XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["conversation.send"].isEnabled)
+        app.buttons["settings.open"].tap()
+        XCTAssertTrue(app.buttons["account.restore"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Continue with ChatGPT"].exists)
+        // Deliberately do not restore or sign in. Real credentials are never read by this test.
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["conversation.send"].isEnabled)
+    }
+
+    @MainActor
+    func testProductionAppKeychainPreflightUsesOnlySyntheticRecords() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--mvp-keychain-preflight"]
+        app.launch()
+        let status = app.staticTexts["diagnostics.keychain.preflight"]
+        XCTAssertTrue(status.waitForExistence(timeout: 15))
+        XCTAssertTrue(status.label.hasPrefix("PASS"), status.label)
+        XCTAssertFalse(app.buttons["conversation.start"].exists)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(status.waitForExistence(timeout: 15))
+        XCTAssertTrue(status.label.hasPrefix("PASS"), status.label)
+    }
+
+    @MainActor
+    func testProductionSDKSetupFailureKeepsAccountUIUsableInBothLanguages() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--mvp-smoke-testing", "--mvp-force-sdk-setup-failure"]
+        app.launch()
+        XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 15))
+        app.segmentedControls["conversation.language"].buttons["中文"].tap()
+        XCTAssertTrue(app.staticTexts["glasses.setup.status"].label.contains("眼镜功能未配置"))
+        XCTAssertFalse(app.buttons["conversation.photo"].isEnabled)
+        app.segmentedControls["conversation.language"].buttons["English"].tap()
+        XCTAssertTrue(app.staticTexts["glasses.setup.status"].label.contains("Glasses features are not configured"))
+        app.buttons["settings.open"].tap()
+        XCTAssertTrue(app.buttons["Continue with ChatGPT"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Authorize glasses camera"].isEnabled)
+        XCTAssertFalse(app.buttons["Connect / register glasses"].isEnabled)
+        XCTAssertFalse(app.buttons["Install / update developer component"].isEnabled)
+    }
+
+    @MainActor
     private func launch(resetLanguage: Bool = true, additionalArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--mvp-ui-testing"]

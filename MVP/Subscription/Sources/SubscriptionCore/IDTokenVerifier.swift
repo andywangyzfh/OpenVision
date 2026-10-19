@@ -11,7 +11,11 @@ public enum IDTokenVerifier {
         public let revocation_endpoint: URL?
     }
     public static func discovery() async throws -> Discovery {
-        let (data, response) = try await PlanHTTPTransport.session.data(from: URL(string: SubscriptionContract.issuer + "/.well-known/openid-configuration")!)
+        try await discovery(session: PlanHTTPTransport.session)
+    }
+    /// Session injection replaces transport only; issuer and endpoint trust checks remain live.
+    public static func discovery(session: URLSession) async throws -> Discovery {
+        let (data, response) = try await session.data(from: URL(string: SubscriptionContract.issuer + "/.well-known/openid-configuration")!)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PlanError.invalidIdentity }
         let metadata = try JSONDecoder().decode(Discovery.self, from: data)
         guard metadata.issuer == SubscriptionContract.issuer, trusted(metadata.jwks_uri),
@@ -19,11 +23,15 @@ public enum IDTokenVerifier {
         return metadata
     }
     private static func trusted(_ url: URL) -> Bool {
-        url.scheme == "https" && url.host == "auth.openai.com" && url.user == nil && url.password == nil
+        url.scheme == "https" && url.host == "auth.openai.com" && (url.port == nil || url.port == 443)
+            && url.user == nil && url.password == nil && url.fragment == nil
     }
     public static func verify(_ token: String, clientID: String, nonce: String?) async throws -> [String: Any] {
-        let metadata = try await discovery()
-        let (keysData, response) = try await PlanHTTPTransport.session.data(from: metadata.jwks_uri)
+        try await verify(token, clientID: clientID, nonce: nonce, session: PlanHTTPTransport.session)
+    }
+    public static func verify(_ token: String, clientID: String, nonce: String?, session: URLSession) async throws -> [String: Any] {
+        let metadata = try await discovery(session: session)
+        let (keysData, response) = try await session.data(from: metadata.jwks_uri)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PlanError.invalidIdentity }
         return try verify(token, clientID: clientID, nonce: nonce, jwks: keysData)
     }

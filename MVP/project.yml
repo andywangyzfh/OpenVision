@@ -67,6 +67,9 @@ targets:
       - path: App/SpeechDriver.swift
       - path: App/Account/ChatGPTSessionStore.swift
       - path: App/Account/PlanCredentialStorage.swift
+      - path: App/Account/ChatGPTAccountService.swift
+      - path: App/Account/AccountCoordinatorDependencies.swift
+      - path: App/Account/PlanAuthCallback.swift
     dependencies:
       - target: OpenVisionMVPTestHost
       - package: OpenVisionCore
