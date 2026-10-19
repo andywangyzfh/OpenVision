@@ -1,12 +1,20 @@
 # Validation record / 实测记录
 
-## 本轮真机准备进度（2026-10-19，尚未验收）
+## 暂停检查点（2026-10-19）
 
-独立CI [39221241977](https://github.com/andywangyzfh/OpenVision/actions/runs/39221241977) 已成功，源码头为2107e0d。真实 iPhone15ProMax / iOS27.0.1 (24A446) 已配对，Developer Mode已核验开启。Xcode Personal Team签名构建、正常系统权限codesign deep/strict校验、目标手机及Bundle配置匹配、实际安装均通过。免费开发配置到期2026-10-26，可由Xcode重新签名安装。
+用户要出门断开手机，**真机测试已停止，等待本人要求继续**。已安装并实测b1c2ea5，Debug0.1.0(2)：官方授权、目录、显式恢复及2次真实算术回答成功；第二次短中文模式播报由用户确认“有声，没问题”。总手动推理尝试5次（旧版3未完成/调试中断，修复版2完成）；无原始中文长输入或英文/上下文通过证明。
 
-**H01仅部分完成**：第一次启动返回iOS Security拒绝，系统要求本人显式信任开发配置；已请求用户在“设置→通用→VPN与设备管理”完成。没有绕过信任检查。设备上的Keychain/AppSupport探针、正式账号授权、模型、语音和眼镜仍未执行，不能把安装成功当产品可用。
+[#16](https://github.com/andywangyzfh/OpenVision/issues/16)缺失MIME问题已修复：局部network36、flow59、Subscription XCTest14、正式iOS构建签名安装通过，独立局部Review批准；没有把旧84项整套结果说成新提交全量复跑。新发现[#17](https://github.com/andywangyzfh/OpenVision/issues/17)播报完成/Stop文案残留；VM修复WIP已落盘、**未做回归/编译，未装到手机**。下一次先补验证再安装。逐项事实、产物hash、未发英文草稿、剩余用例及恢复顺序见[完整检查点](checkpoints/2026-10-19-device-session.md)。真实STT、眼镜与图片仍未验收，整体NOT ACCEPTED，主issue开放/PR为draft。
 
-构建来源02e40d2（产品等价c5c375b），仅在临时工程选择本地签名团队。没有把Apple账号、UDID、序列号、证书私钥或token提交到仓库。脱敏本地报告位于task outputs/OpenVision-MVP-validation/device-20261019/。下方本地及历史结果仍按各自SHA/日期解释。
+## 本轮真机与真实账号进度（2026-10-19，产品未验收）
+
+用户完成开发者信任后，真实iPhone15ProMax / iOS27.0.1 (24A446) 上的正式App合成Keychain CRUD、实际AppSupport marker预检及无测试参数正常启动均PASS。签名构建/安装、codesign与手机/Bundle匹配已通过；免费开发配置到2026-10-26，可由Xcode重新签名。安装版本0.1.0 (1)，来源02e40d2（产品等价c5c375b）；可执行文件SHA256为`6228e7b6cfb5042e31bb63eb025019f7c5f91f7ddd1dc0f0c0530ea1ab2f6932`。CI [39221241977](https://github.com/andywangyzfh/OpenVision/actions/runs/39221241977) 在2107e0d成功。
+
+**真实官方授权功能通过**：auth.openai.com账号页可达；X取消回未登录并能重开；用户亲自授权后回App，真实账号及非空模型目录出现，手动刷新和GPT-6.1-Sol选择完成。O02取消的动态零请求/迟到回调证明及O16动态隐私检查尚未完成。官方Usage页在推理前核验额外credits=0、自动充值关闭；未购买/使用reset/改消费设置。O18每App及事后归属仍未核对。
+
+**真实推理FAIL，跟踪[#16](https://github.com/andywangyzfh/OpenVision/issues/16)**：公开`1+2`共3次手动尝试，无完成答案。调试确认HTTP200且Content-Type及Foundation MIME缺失，生产client格式guard抛malformedResponse。仅查看状态/MIME及header名字，未导出响应正文、完整headers或凭据。第三次在定位后尝试调试跳转导致异步栈EXC_BAD_ACCESS，已终止并正常重启；该次单列调试中断，不当作产品成功或正常运行崩溃。最小兼容修复及本地回归进行中，不能宣称中文问答可用。
+
+冷重启已观察账号未激活、发送禁用；完整显式恢复仍未完成。App显示眼镜未连接/相机关闭，不能用标签证明硬件状态。真实语音、眼镜、新图、退出/撤销/自然刷新、动态日志及稳定性仍未验收。脱敏本地证据见task outputs/OpenVision-MVP-validation/device-20261019/after-trust-report.md；未发布账号截图、邮箱、设备标识或签名秘密。**整体NOT ACCEPTED，PR保持draft。**
 
 2026-10-19 第一轮本地回归结论：**S0 本地软件门槛已获独立 Review APPROVE；产品整体仍 NOT ACCEPTED。** 当时S1/S2未执行；后续真机安装进度见顶部。没有读取其他 App 的凭据，也没有进行真实模型或付费 API 调用。
 

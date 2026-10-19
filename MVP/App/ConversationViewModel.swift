@@ -48,6 +48,7 @@ final class ConversationViewModel: ObservableObject {
             guard let self, self.stage == .speaking else { return }
             self.busy = false
             self.lifecycle.stop(); self.stage = .idle
+            if self.hasActivityStatus { self.status = self.completedStatus }
             if self.conversationActive { self.beginListening() }
         }
         speech.onFailure = { [weak self] in
@@ -76,6 +77,17 @@ final class ConversationViewModel: ObservableObject {
         text("眼镜功能未配置：Meta SDK 初始化失败。请配置真实 Meta 应用及 Apple 签名后重新启动。文字聊天与账号设置仍可使用。", "Glasses features are not configured: Meta SDK initialization failed. Configure a real Meta app and Apple signing, then relaunch. Text chat and account settings remain available.")
     }
     func text(_ chinese: String, _ english: String) -> String { language == .chinese ? chinese : english }
+
+    private var completedStatus: String {
+        text("本轮已完成。可继续输入，或点击“开始对话”。", "Turn complete. Ask another question or tap Start conversation.")
+    }
+
+    /// Status can also contain account, permission or background guidance. Only replace the
+    /// known activity messages, including the old language's text after a language switch.
+    private var hasActivityStatus: Bool {
+        ["正在按需拍照…", "Taking the requested photo…", "正在回答…", "Thinking…",
+         "正在播报…", "Speaking…", "正在听，请说中文。", "Listening. Speak in English."].contains(status)
+    }
 
     func handleRegistrationURL(_ url: URL) async {
         guard url.scheme == "openvisionmvp" else { return }
@@ -237,7 +249,7 @@ final class ConversationViewModel: ObservableObject {
                 history.append(.init(role: "user", text: String(question.prefix(6000)), imageJPEG: nil))
                 history.append(.init(role: "assistant", text: String(answer.prefix(6000)), imageJPEG: nil))
                 history = Array(history.suffix(12))
-                if preview { busy = false; lifecycle.stop(); stage = .idle; return }
+                if preview { busy = false; lifecycle.stop(); stage = .idle; status = completedStatus; return }
                 _ = lifecycle.advance(id, to: .speaking); stage = .speaking
                 status = text("正在播报…", "Speaking…")
                 try speech.speak(answer, language: language.responseLanguage(for: question))
@@ -284,6 +296,9 @@ final class ConversationViewModel: ObservableObject {
         lifecycle.stop(); stage = .idle; busy = false
         turnTask?.cancel(); turnTask = nil
         speech.stopAll(); glasses.stop()
+        if hasActivityStatus {
+            status = text("已停止。可继续输入，或点击“开始对话”。", "Stopped. Ask another question or tap Start conversation.")
+        }
     }
 
     func clear() { stop(); messages.removeAll(); history.removeAll(); status = "" }

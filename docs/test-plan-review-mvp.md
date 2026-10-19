@@ -1,5 +1,9 @@
 # Independent Submission Review / 独立测试计划审阅
 
+## 2026-10-19 真机缺失MIME局部复核
+
+独立submission_review只读核对b1c2ea5的3文件diff及network36日志，未自行实发或重跑，结论局部修复APPROVE。显式错误MIME仍拒绝，缺失MIME必须通过既有SSE/完成/非空文本。主agent随后正常真机2次完整短回答，第二次播报用户确认有声正常。#17的状态文案WIP未经过测试或本次Review，不在已安装版本中。用户已要求暂停；整体仍NOT ACCEPTED，见[检查点](checkpoints/2026-10-19-device-session.md)。
+
 ## 2026-10-19 正式独立复核
 
 审阅者仍为独立只读 `submission_review`，未实现本轮修复、未自行重跑产品测试、未登录账号或调用模型。审查对象为固定源码、归档哈希和实际执行日志。
