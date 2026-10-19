@@ -8,19 +8,24 @@ struct MVPContentView: View {
     @ObservedObject var glasses: GlassesPhotoService
     @ObservedObject var speech: SpeechService
     @Environment(\.scenePhase) private var scenePhase
+    @FocusState private var questionFocused: Bool
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                Picker(model.text("语言", "Language"), selection: $model.language) {
-                    ForEach(ConversationLanguage.allCases) { Text($0.displayName).tag($0) }
-                }.pickerStyle(.segmented).accessibilityIdentifier("conversation.language")
-                if model.debugPreview {
-                    Text("LOCAL FIXTURE · NO NETWORK / 本地假数据模式").font(.caption).foregroundStyle(.orange)
-                }
-                if !glasses.sdkAvailable && !model.debugPreview {
-                    Text(model.glassesSetupMessage).font(.caption).foregroundStyle(.orange)
-                        .accessibilityIdentifier("glasses.setup.status")
+            VStack(spacing: questionFocused ? 6 : 12) {
+                // Keep the composer usable on compact screens while the keyboard is up.
+                // Sending ends editing, restoring these details and the full chat viewport.
+                if !questionFocused {
+                    Picker(model.text("语言", "Language"), selection: $model.language) {
+                        ForEach(ConversationLanguage.allCases) { Text($0.displayName).tag($0) }
+                    }.pickerStyle(.segmented).accessibilityIdentifier("conversation.language")
+                    if model.debugPreview {
+                        Text("LOCAL FIXTURE · NO NETWORK / 本地假数据模式").font(.caption).foregroundStyle(.orange)
+                    }
+                    if !glasses.sdkAvailable && !model.debugPreview {
+                        Text(model.glassesSetupMessage).font(.caption).foregroundStyle(.orange)
+                            .accessibilityIdentifier("glasses.setup.status")
+                    }
                 }
                 HStack {
                     Label(glasses.deviceCount > 0 ? model.text("眼镜已连接", "Glasses connected") : model.text("眼镜未连接", "Glasses disconnected"), systemImage: "eyeglasses")
@@ -40,35 +45,48 @@ struct MVPContentView: View {
                                 }.frame(maxWidth: .infinity, alignment: .leading).id(line.id)
                             }
                         }.padding(.vertical)
-                    }.onChange(of: model.messages.count) { _, _ in
+                    }.accessibilityIdentifier("conversation.messages")
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: model.messages.count) { _, _ in
                         if let id = model.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
                     }
                 }
-                if !speech.transcript.isEmpty && speech.isListening { Text(speech.transcript).font(.callout).foregroundStyle(.secondary) }
+                if !questionFocused {
+                    if !speech.transcript.isEmpty && speech.isListening { Text(speech.transcript).font(.callout).foregroundStyle(.secondary) }
+                }
                 if speech.isListening { Text(model.text("当前输入：", "Current input: ") + speech.inputName).font(.caption2).foregroundStyle(.secondary) }
-                Text(model.status).font(.caption).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("conversation.status")
+                Text(model.status).font(.caption).lineLimit(questionFocused ? 2 : nil)
+                    .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("conversation.status")
                 HStack {
-                    Button { Task { await model.toggleConversation() } } label: {
+                    Button { questionFocused = false; Task { await model.toggleConversation() } } label: {
                         Label(model.conversationActive ? model.text("结束对话", "End conversation") : model.text("开始对话", "Start conversation"), systemImage: "mic")
                     }.buttonStyle(.borderedProminent).disabled(model.busy || model.authorizingSpeech).accessibilityIdentifier("conversation.start")
-                    Button(model.text("停止", "Stop")) { model.stop() }.buttonStyle(.bordered).accessibilityIdentifier("conversation.stop")
+                    Button(model.text("停止", "Stop")) { questionFocused = false; model.stop() }.buttonStyle(.bordered).accessibilityIdentifier("conversation.stop")
                 }
                 HStack(alignment: .bottom) {
                     TextField(model.text("输入问题，或点击相机拍照提问", "Ask a question, or tap the camera to ask about a photo"), text: $model.draft, axis: .vertical)
+                        .focused($questionFocused)
                         .lineLimit(1...4).textFieldStyle(.roundedBorder).accessibilityIdentifier("conversation.input")
-                    Button { model.sendDraft() } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
+                    Button { questionFocused = false; model.sendDraft() } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
                         .disabled(!model.canSend || model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityLabel(model.text("发送", "Send")).accessibilityIdentifier("conversation.send")
-                    Button { model.sendDraft(photo: true) } label: { Image(systemName: "camera.fill").font(.title2) }
+                    Button { questionFocused = false; model.sendDraft(photo: true) } label: { Image(systemName: "camera.fill").font(.title2) }
                         .disabled(!model.canSend || (!glasses.sdkAvailable && !model.debugPreview)).accessibilityLabel(model.text("拍照问答", "Photo question")).accessibilityIdentifier("conversation.photo")
                 }
-                Text(model.text("照片仅用于本轮；会话不保存到磁盘。MVP 请保持 App 在前台。", "Photos are used for this turn only; chats are not saved to disk. Keep this MVP in the foreground."))
+                if !questionFocused {
+                    Text(model.text("照片仅用于本轮；会话不保存到磁盘。MVP 请保持 App 在前台。", "Photos are used for this turn only; chats are not saved to disk. Keep this MVP in the foreground."))
                     .font(.caption2).foregroundStyle(.secondary)
-            }.padding()
+                }
+            }.padding(questionFocused ? 8 : 16)
                 .navigationTitle("OpenVision MVP")
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) { Button(model.text("清空", "Clear")) { model.clear() } }
-                    ToolbarItem(placement: .topBarTrailing) { Button { model.showAccount = true } label: { Image(systemName: "gearshape") }.accessibilityIdentifier("settings.open") }
+                    ToolbarItem(placement: .topBarLeading) { Button(model.text("清空", "Clear")) { questionFocused = false; model.clear() } }
+                    ToolbarItem(placement: .topBarTrailing) { Button { questionFocused = false; model.showAccount = true } label: { Image(systemName: "gearshape") }.accessibilityIdentifier("settings.open") }
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button(model.text("完成", "Done")) { questionFocused = false }
+                            .accessibilityIdentifier("conversation.dismiss-keyboard")
+                    }
                 }
                 .sheet(isPresented: $model.showAccount) { settings }
                 .onChange(of: model.showAccount) { _, presented in

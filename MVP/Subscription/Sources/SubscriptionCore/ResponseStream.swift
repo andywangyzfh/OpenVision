@@ -7,7 +7,8 @@ public struct ResponseStream {
     private var completed = false
     private var characters = 0
     private var rawLine = Data()
-    public init() {}
+    private let observer: (@Sendable (PlanStreamObservation) -> Void)?
+    public init(observer: (@Sendable (PlanStreamObservation) -> Void)? = nil) { self.observer = observer }
 
     /// AsyncBytes.lines drops blank lines. Read bytes directly so SSE event boundaries survive.
     public mutating func consume(byte: UInt8) throws {
@@ -44,6 +45,7 @@ public struct ResponseStream {
         case "response.output_text.delta":
             guard !completed, let delta = event["delta"] as? String else { throw PlanError.malformedResponse }
             text += delta
+            observer?(.textDelta(hasNonWhitespaceText: !delta.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
         case "response.completed":
             guard !completed else { throw PlanError.malformedResponse }
             let response = event["response"] as? [String: Any]
@@ -54,6 +56,7 @@ public struct ResponseStream {
                     .compactMap { $0["text"] as? String }.joined()
             }
             completed = true
+            observer?(.completed(usage: (response?["usage"] as? [String: Any]).map(PlanTokenUsage.init)))
         case "response.failed", "error":
             let response = event["response"] as? [String: Any]
             let error = (response?["error"] ?? event["error"]) as? [String: Any]

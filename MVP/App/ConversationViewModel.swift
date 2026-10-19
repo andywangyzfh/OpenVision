@@ -35,12 +35,34 @@ final class ConversationViewModel: ObservableObject {
     private var startGeneration = UUID()
     private var accountActionGeneration = UUID()
     private var accountObserver: AnyCancellable?
+    #if DEBUG
+    struct LocalModelEffect {
+        let model: PlanModel
+        let respond: @MainActor (String, String, [PlanTurn]) async throws -> String
+    }
+    private var localModelEffect: LocalModelEffect?
 
-    init(account: ChatGPTAccountService, preview: Bool = false, sdkAvailable: Bool = false) {
+    /// Simulator UI regressions replace only the model effect. They still execute run(),
+    /// real SpeechService, its driver callback, and the normal completion state transition.
+    func installLocalModelEffect(_ effect: LocalModelEffect) {
+        localModelEffect = effect
+        models = [effect.model]; modelID = effect.model.id
+    }
+    #endif
+
+    private var usesLocalModelEffect: Bool {
+        #if DEBUG
+        localModelEffect != nil
+        #else
+        false
+        #endif
+    }
+
+    init(account: ChatGPTAccountService, preview: Bool = false, sdkAvailable: Bool = false, speechService: SpeechService? = nil) {
         self.account = account
         self.preview = preview
         client = ChatGPTPlanClient(account: account)
-        speech = SpeechService()
+        speech = speechService ?? SpeechService()
         glasses = GlassesPhotoService(monitoring: !preview, sdkAvailable: sdkAvailable)
         language = ConversationLanguage(rawValue: UserDefaults.standard.string(forKey: "mvp.language") ?? "") ?? .chinese
         speech.onUtterance = { [weak self] in self?.submit($0) }
@@ -59,7 +81,7 @@ final class ConversationViewModel: ObservableObject {
         if preview { models = [.init(id: "fixture", name: "Local fixture (no network)")]; modelID = "fixture" }
         accountObserver = account.$isSignedIn.removeDuplicates().sink { [weak self] signedIn in
             Task { @MainActor [weak self] in
-                guard let self, !self.preview, signedIn == self.account.isSignedIn else { return }
+                guard let self, !self.preview, !self.usesLocalModelEffect, signedIn == self.account.isSignedIn else { return }
                 if signedIn { await self.refreshModels() }
                 else {
                     self.stop(); self.models = []; self.modelID = ""
@@ -70,7 +92,7 @@ final class ConversationViewModel: ObservableObject {
         if !sdkAvailable && !preview { status = glassesSetupMessage }
     }
 
-    var ready: Bool { preview || account.isSignedIn }
+    var ready: Bool { preview || usesLocalModelEffect || account.isSignedIn }
     var canSend: Bool { ready && !busy && !modelID.isEmpty }
     var debugPreview: Bool { preview }
     var glassesSetupMessage: String {
@@ -241,7 +263,7 @@ final class ConversationViewModel: ObservableObject {
                 let turn = PlanTurn(role: "user", text: question, imageJPEG: jpeg)
                 let answer: String
                 if preview { answer = language == .chinese ? "本地测试回答。没有调用模型。" : "Local test reply. No model was called." }
-                else { answer = try await client.respond(model: model, instructions: language.systemPrompt(for: question), turns: Array(history.suffix(12)) + [turn]) }
+                else { answer = try await respond(model: model, instructions: language.systemPrompt(for: question), turns: Array(history.suffix(12)) + [turn]) }
                 try Task.checkCancellation()
                 guard lifecycle.isCurrent(id), activeForeground else { return }
                 messages.append(.init(user: false, text: answer, photo: false))
@@ -266,6 +288,13 @@ final class ConversationViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func respond(model: String, instructions: String, turns: [PlanTurn]) async throws -> String {
+        #if DEBUG
+        if let localModelEffect { return try await localModelEffect.respond(model, instructions, turns) }
+        #endif
+        return try await client.respond(model: model, instructions: instructions, turns: turns)
     }
 
     private func failureMessage(_ error: Error) -> String {

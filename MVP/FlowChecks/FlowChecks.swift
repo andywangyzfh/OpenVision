@@ -264,6 +264,107 @@ private func additionalScenarios() -> [(String, @MainActor () async throws -> Vo
     return scenarios
 }
 
+@MainActor
+private func statusScenarios() -> [(String, @MainActor () async throws -> Void)] {
+    var scenarios: [(String, @MainActor () async throws -> Void)] = []
+    for language in ConversationLanguage.allCases {
+        scenarios.append(("status: single typed turn finishes idle and can send again " + language.rawValue, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.language = language
+            send(vm, language == .chinese ? "1加2等于多少" : "What is one plus two?")
+            try await finishTurn(vm)
+            let completion = language == .chinese ? "本轮已完成" : "Turn complete"
+            try expect(vm.status.contains(completion), "Completion status remained stale: " + vm.status)
+            try expect(!vm.busy && vm.stage == .idle && vm.canSend && !vm.conversationActive, "Finished typed turn did not return to actionable idle")
+            try expect(vm.speech.listening.isEmpty, "Typed completion unexpectedly opened microphone")
+            let stable = vm.status
+            vm.speech.finishPlayback(); await drain()
+            try expect(vm.status == stable && vm.stage == .idle, "Duplicate completion changed idle state")
+            send(vm, language == .chinese ? "再回答一次" : "Answer once more")
+            try await finishTurn(vm)
+            try expect(world.requests.count == 2 && vm.canSend && vm.status.contains(completion), "The next typed turn could not complete")
+        }))
+        scenarios.append(("status: Stop cancels speaking and rejects late finish " + language.rawValue, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.language = language
+            send(vm, language == .chinese ? "请回答这个问题" : "Please answer this question")
+            try await eventually("speaking before Stop") { vm.stage == .speaking }
+            vm.stop()
+            let stopped = vm.status
+            try expect(stopped.contains(language == .chinese ? "已停止" : "Stopped"), "Stop retained speaking text: " + stopped)
+            try expect(vm.canSend && !vm.busy && vm.stage == .idle && !vm.conversationActive, "Stop left controls busy")
+            vm.speech.finishPlayback(); await drain()
+            try expect(vm.status == stopped && vm.stage == .idle && world.requests.count == 1, "Late finish overwrote stopped state")
+        }))
+        scenarios.append(("status: Stop cancels thinking and rejects late model " + language.rawValue, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.language = language; world.holdResponses = true
+            send(vm, language == .chinese ? "等待中的问题" : "A pending question")
+            try await eventually("pending model") { world.pendingResponses.count == 1 }
+            vm.stop()
+            let stopped = vm.status
+            try expect(stopped.contains(language == .chinese ? "已停止" : "Stopped"), "Stop retained thinking text: " + stopped)
+            world.resolveResponses(); await drain()
+            try expect(vm.status == stopped && vm.stage == .idle && vm.canSend && vm.speech.spoken.isEmpty, "Late model changed stopped status")
+        }))
+        scenarios.append(("status: continuous speech completion resumes listening " + language.rawValue, {
+            let (vm, world) = try await setup(); defer { vm.stop() }
+            vm.language = language
+            await vm.toggleConversation()
+            vm.speech.emitUtterance(language == .chinese ? "1加2等于多少" : "What is one plus two?")
+            try await finishTurn(vm)
+            let listening = language == .chinese ? "正在听，请说中文。" : "Listening. Speak in English."
+            try expect(vm.status == listening && vm.stage == .listening && vm.conversationActive && vm.speech.isListening, "Continuous turn failed to return to real listening state")
+            try expect(!vm.busy && world.requests.count == 1 && vm.speech.listening.count == 2, "Continuous completion duplicated request/listen")
+            vm.speech.finishPlayback(); await drain()
+            try expect(vm.status == listening && vm.speech.listening.count == 2, "Late completion restarted listening twice")
+        }))
+    }
+    scenarios.append(("status: completion and Stop preserve concrete account failure guidance", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        send(vm, "请回答问题")
+        try await eventually("speaking before account error") { vm.stage == .speaking }
+        world.modelsError = .service("http_403")
+        await vm.refreshModels()
+        let failure = vm.status
+        try expect(failure.contains("没有此请求的权限"), "Expected concrete permission guidance")
+        vm.speech.finishPlayback(); await drain()
+        try expect(vm.status == failure && vm.stage == .idle && !vm.busy, "Completion overwrote a concrete failure")
+        vm.stop()
+        try expect(vm.status == failure, "Stop overwrote concrete failure guidance")
+    }))
+    scenarios.append(("status: Stop preserves missing voice recovery guidance", {
+        let (vm, world) = try await setup(); defer { vm.stop() }
+        vm.speech.speakError = .voiceMissing
+        send(vm, "请回答问题")
+        try await eventually("missing voice settled") { world.requests.count == 1 && !vm.busy }
+        let failure = vm.status
+        try expect(failure.contains("播报声音"), "Missing voice guidance absent")
+        vm.stop(); vm.speech.finishPlayback(); await drain()
+        try expect(vm.status == failure && vm.stage == .idle, "Stop/late callback replaced missing voice guidance")
+    }))
+    for action in ["background", "clear", "sign-out"] {
+        scenarios.append(("status: late playback preserves " + action + " guidance", {
+            let (vm, _) = try await setup(); defer { vm.stop() }
+            send(vm, "请回答问题")
+            try await eventually("speaking before priority action") { vm.stage == .speaking }
+            switch action {
+            case "background": vm.setForeground(false)
+            case "clear": vm.clear()
+            default: await vm.signOut()
+            }
+            await drain()
+            let priority = vm.status
+            if action == "background" { try expect(priority.contains("已暂停"), "Pause guidance absent") }
+            else if action == "clear" { try expect(priority.isEmpty && vm.messages.isEmpty, "Clear was not empty") }
+            else { try expect(priority.contains("已移除本机登录"), "Sign-out guidance absent") }
+            vm.speech.finishPlayback(); vm.stop(); await drain()
+            try expect(vm.status == priority && vm.stage == .idle && !vm.busy, "Late finish/Stop replaced priority state")
+        }))
+    }
+    return scenarios
+}
+
 @main
 struct FlowChecks {
     @MainActor
@@ -495,13 +596,16 @@ struct FlowChecks {
             })
         ]
         do {
-            let allScenarios = scenarios + additionalScenarios()
-            for (name, scenario) in allScenarios {
+            let allScenarios = scenarios + additionalScenarios() + statusScenarios()
+            let filter = ProcessInfo.processInfo.environment["OPENVISION_FLOW_FILTER"]
+            let selected = filter.map { needle in allScenarios.filter { $0.0.contains(needle) } } ?? allScenarios
+            try expect(!selected.isEmpty, "No scenarios matched the requested filter")
+            for (name, scenario) in selected {
                 try await scenario()
                 await drain()
                 print("PASS: " + name)
             }
-            print("PASS: \(allScenarios.count) production ConversationViewModel flow scenarios. Platform, account and model services are fakes; this does not validate iPhone or glasses hardware.")
+            print("PASS: \(selected.count) production ConversationViewModel flow scenarios. Platform, account and model services are fakes; this does not validate iPhone or glasses hardware.")
         } catch {
             FileHandle.standardError.write(Data("FAIL: production VM flow acceptance: \(error)\n".utf8))
             restoreDefaults() // exit() does not unwind defer blocks.
