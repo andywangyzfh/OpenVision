@@ -9,6 +9,7 @@ struct OpenVisionMVPApp: App {
     @Environment(\.scenePhase) private var scenePhase
     private let voiceCoordinator: GlassesVoiceCoordinator
     private let preflightStatus: String?
+    private let isMediaProbe: Bool
     #if DEBUG
     private let statusFixture: StatusUITestFixture?
     private var focusObserver: (@MainActor @Sendable (Bool) -> Void)? {
@@ -20,6 +21,7 @@ struct OpenVisionMVPApp: App {
     init() {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
+        isMediaProbe = arguments.contains("--mvp-media-probe")
         let preview = arguments.contains("--mvp-ui-testing")
         let platformStatusTesting = arguments.contains("--mvp-platform-status-testing")
         statusFixture = platformStatusTesting ? StatusUITestFixture(arguments: arguments) : nil
@@ -31,12 +33,13 @@ struct OpenVisionMVPApp: App {
         }
         #else
         let preview = false
+        isMediaProbe = false
         let platformStatusTesting = false
         let preflight = false
         preflightStatus = nil
         #endif
         var sdkAvailable = false
-        if !preview && !preflight && !platformStatusTesting {
+        if !preview && !preflight && !platformStatusTesting && !isMediaProbe {
             do {
                 #if DEBUG
                 if arguments.contains("--mvp-force-sdk-setup-failure") { throw SDKStartupFailure.injected }
@@ -49,7 +52,7 @@ struct OpenVisionMVPApp: App {
         let account = ChatGPTAccountService()
         #if DEBUG
         let injectedSpeech = statusFixture.map { SpeechService(driver: $0) }
-        let model = ConversationViewModel(account: account, preview: preview, sdkAvailable: sdkAvailable, speechService: injectedSpeech)
+        let model = ConversationViewModel(account: account, preview: preview || isMediaProbe, sdkAvailable: sdkAvailable, speechService: injectedSpeech)
         if let statusFixture { model.installLocalModelEffect(statusFixture.modelEffect()) }
         #else
         let model = ConversationViewModel(account: account, preview: preview, sdkAvailable: sdkAvailable)
@@ -63,7 +66,11 @@ struct OpenVisionMVPApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let preflightStatus {
+            if isMediaProbe {
+                #if DEBUG
+                BluetoothMediaProbeView()
+                #endif
+            } else if let preflightStatus {
                 Text(preflightStatus).padding().accessibilityIdentifier("diagnostics.keychain.preflight")
             } else {
                 VStack(spacing: 0) {
