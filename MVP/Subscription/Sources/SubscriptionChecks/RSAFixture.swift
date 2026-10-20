@@ -1,0 +1,6 @@
+// Public signature-verification fixture; its ephemeral private key was discarded.
+import Foundation
+enum RSAFixture {
+    static let token = "eyJhbGciOiJSUzI1NiIsImtpZCI6InJzYS1maXh0dXJlIn0.eyJpc3MiOiJodHRwczovL2F1dGgub3BlbmFpLmNvbSIsImF1ZCI6Im9haWFwcF90ZXN0Iiwic3ViIjoibG9jYWwtdGVzdC11c2VyIiwibm9uY2UiOiJub25jZSIsImV4cCI6NDEwMjQ0NDgwMH0.c2LCylNbz9zTmYjm02jnQJeJLzJaTdYPOCgl3f7BKgvrMoVpZRMhS6cgk555b8UQJwMkubmnWbbXsN3EI3KxiVlgWbYTTBUZxCk8nX8P82T79uw00s6_gFMbrnAnJwTdXAxSHVJcl8jg-wCnbQMzGLGa7gi5w_ZcG5uqbUi7t6onmIJeNR0_2hEzZpI6QWSuKOjujISVrCFy2EXAO7759TOydgWIPrriMgAkHR7HoioASmPoYJqsMrAf2wRJgb3EhUk5rK86CU-A_yVO2mPaAnvoY9wRJHLVXIO3yGSoES00ntCUksQCpkwUu4JWD-t3VAbfoJbMJKN8UgtJgj4AqA"
+    static let jwks = Data(#"{"keys":[{"kid":"rsa-fixture","alg":"RS256","kty":"RSA","n":"zHgBQdoeLNMK9Z5whAbtCNEvdqlrVG70sFukmnYHQ_o03iUnRXjUWfVunXEr5raTTwlchIyuKbOvCYcrclIxEh9A86E4DuaPudc9xUb5EFgpo-azsHcxWVnbRQyLjg_1olJy1QqA57LXRnHlquA23bp4bInjJgvEzV7lbfZe2hBOZgKxXlBuLW9YWVr8iC2UXnblYDNzlFrC3dTKX9f8ZcYZMHKz3qMiedsEvZZiHN6VoP2jDoFuubx2Nxy6c160OCi1twB6T-EZ4IL0c_2B3ykc2enSEK3rk-0-Y8LozZI6Al4t8dzyzgdGehJ5YH4MFUNfMmghkXSJTwu-CuRM4Q","e":"AQAB"}]}"#.utf8)
+}

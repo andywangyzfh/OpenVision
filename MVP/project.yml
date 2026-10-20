@@ -1,0 +1,114 @@
+name: OpenVisionMVP
+options:
+  deploymentTarget:
+    iOS: "17.2"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+    META_APP_ID: "0"
+    CLIENT_TOKEN: ""
+packages:
+  OpenVisionCore:
+    path: Core
+  SubscriptionCore:
+    path: Subscription
+  MetaDAT:
+    url: https://github.com/facebook/meta-wearables-dat-ios
+    exactVersion: "1.0.1"
+targets:
+  OpenVisionMVP:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Resources
+        excludes: [Info.plist]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp
+        PRODUCT_NAME: OpenVisionMVP
+        INFOPLIST_FILE: Resources/Info.plist
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: false
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: false
+    dependencies:
+      - package: OpenVisionCore
+      - package: SubscriptionCore
+      - package: MetaDAT
+        product: MWDATCore
+      - package: MetaDAT
+        product: MWDATCamera
+      - package: MetaDAT
+        product: MWDATInputs
+  OpenVisionMVPTestHost:
+    type: application
+    platform: iOS
+    sources: [TestHost]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp.testhost
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: TestHost/Simulator.entitlements
+  OpenVisionMVPPlatformTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PlatformTests
+      # Compile the exact production control/storage sources in an isolated test bundle.
+      # The dedicated empty host has no account or hardware initialization.
+      - path: App/GlassesPhotoService.swift
+      - path: App/DATCameraDriver.swift
+      - path: App/SpeechService.swift
+      - path: App/SpeechDriver.swift
+      - path: App/Account/ChatGPTSessionStore.swift
+      - path: App/Account/PlanCredentialStorage.swift
+      - path: App/Account/ChatGPTAccountService.swift
+      - path: App/Account/AccountCoordinatorDependencies.swift
+      - path: App/Account/PlanAuthCallback.swift
+      - path: App/Account/ChatGPTPlanClient.swift
+      - path: App/ConversationViewModel.swift
+      - path: App/GlassesInputService.swift
+      - path: App/DATInputDriver.swift
+      - path: App/GlassesVoiceCoordinator.swift
+    dependencies:
+      - target: OpenVisionMVPTestHost
+      - package: OpenVisionCore
+      - package: SubscriptionCore
+      - package: MetaDAT
+        product: MWDATCore
+      - package: MetaDAT
+        product: MWDATCamera
+      - package: MetaDAT
+        product: MWDATInputs
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp.platformtests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/OpenVisionMVPTestHost.app/OpenVisionMVPTestHost
+        BUNDLE_LOADER: $(TEST_HOST)
+  OpenVisionMVPUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: OpenVisionMVP
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: com.andywang.openvision.mvp.uitests
+        TEST_TARGET_NAME: OpenVisionMVP
+schemes:
+  OpenVisionMVP:
+    build:
+      targets:
+        OpenVisionMVP: all
+    test:
+      targets: [OpenVisionMVPPlatformTests, OpenVisionMVPUITests]
+      gatherCoverageData: true

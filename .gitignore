@@ -69,3 +69,8 @@ fabric.properties
 
 # Claude Code
 .claude/
+
+# Bilingual MVP local verification and signing
+.local-build/
+.test-results/
+MVP/Config.xcconfig

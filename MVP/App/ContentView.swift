@@ -1,0 +1,197 @@
+import OpenVisionCore
+import SubscriptionCore
+import SwiftUI
+
+struct MVPContentView: View {
+    @ObservedObject var model: ConversationViewModel
+    @ObservedObject var account: ChatGPTAccountService
+    @ObservedObject var glasses: GlassesPhotoService
+    @ObservedObject var speech: SpeechService
+    @EnvironmentObject private var glassesInputs: GlassesInputService
+    @FocusState private var questionFocused: Bool
+    #if DEBUG
+    @Environment(\.questionFocusObserver) private var questionFocusObserver
+    #endif
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: questionFocused ? 6 : 12) {
+                // Keep the composer usable on compact screens while the keyboard is up.
+                // Sending ends editing, restoring these details and the full chat viewport.
+                if !questionFocused {
+                    Picker(model.text("语言", "Language"), selection: $model.language) {
+                        ForEach(ConversationLanguage.allCases) { Text($0.displayName).tag($0) }
+                    }.pickerStyle(.segmented).accessibilityIdentifier("conversation.language")
+                    if model.debugPreview {
+                        Text("LOCAL FIXTURE · NO NETWORK / 本地假数据模式").font(.caption).foregroundStyle(.orange)
+                    }
+                    if !glasses.sdkAvailable && !model.debugPreview {
+                        Text(model.glassesSetupMessage).font(.caption).foregroundStyle(.orange)
+                            .accessibilityIdentifier("glasses.setup.status")
+                    }
+                }
+                HStack {
+                    Label(glasses.deviceCount > 0 ? model.text("眼镜已连接", "Glasses connected") : model.text("眼镜未连接", "Glasses disconnected"), systemImage: "eyeglasses")
+                    Spacer()
+                    Label(glasses.cameraActive ? model.text("相机开启", "Camera on") : model.text("相机关闭", "Camera off"), systemImage: "camera")
+                        .foregroundStyle(glasses.cameraActive ? Color.orange : Color.secondary)
+                        .accessibilityIdentifier("camera.status")
+                }.font(.caption)
+                if glassesInputs.isEnabled {
+                    Text(glassesInputs.statusText(language: model.language)).font(.caption2)
+                        .accessibilityIdentifier("inputs.main-status")
+                }
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            ForEach(model.messages) { line in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(line.user ? model.text("你", "You") : "OpenVision").font(.caption).foregroundStyle(.secondary)
+                                    if line.photo { Label(model.text("本轮请求拍照", "Photo requested this turn"), systemImage: "camera").font(.caption) }
+                                    Text(line.text).textSelection(.enabled)
+                                }.frame(maxWidth: .infinity, alignment: .leading).id(line.id)
+                            }
+                        }.padding(.vertical)
+                    }.accessibilityIdentifier("conversation.messages")
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: model.messages.count) { _, _ in
+                        if let id = model.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) }
+                    }
+                }
+                if !questionFocused {
+                    if !speech.transcript.isEmpty && speech.isListening { Text(speech.transcript).font(.callout).foregroundStyle(.secondary) }
+                }
+                if speech.isListening { Text(model.text("当前输入：", "Current input: ") + speech.inputName).font(.caption2).foregroundStyle(.secondary) }
+                Text(model.status).font(.caption).lineLimit(questionFocused ? 2 : nil)
+                    .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("conversation.status")
+                HStack {
+                    Button {
+                        let generation = model.voiceActivationGeneration
+                        questionFocused = false
+                        Task { await model.toggleConversation(expectedGeneration: generation) }
+                    } label: {
+                        Label(model.conversationActive ? model.text("结束对话", "End conversation") : model.text("开始对话", "Start conversation"), systemImage: "mic")
+                    }.buttonStyle(.borderedProminent).disabled(model.busy || model.authorizingSpeech).accessibilityIdentifier("conversation.start")
+                    Button(model.text("停止", "Stop")) { questionFocused = false; model.stop() }.buttonStyle(.bordered).accessibilityIdentifier("conversation.stop")
+                }
+                HStack(alignment: .bottom) {
+                    TextField(model.text("输入问题，或点击相机拍照提问", "Ask a question, or tap the camera to ask about a photo"), text: $model.draft, axis: .vertical)
+                        .focused($questionFocused)
+                        .lineLimit(1...4).textFieldStyle(.roundedBorder).accessibilityIdentifier("conversation.input")
+                    Button { questionFocused = false; model.sendDraft() } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
+                        .disabled(!model.canSend || model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityLabel(model.text("发送", "Send")).accessibilityIdentifier("conversation.send")
+                    Button { questionFocused = false; model.sendDraft(photo: true) } label: { Image(systemName: "camera.fill").font(.title2) }
+                        .disabled(!model.canSend || (!glasses.sdkAvailable && !model.debugPreview)).accessibilityLabel(model.text("拍照问答", "Photo question")).accessibilityIdentifier("conversation.photo")
+                }
+                if !questionFocused {
+                    Text(model.text("照片仅用于本轮；会话不保存到磁盘。MVP 请保持 App 在前台。", "Photos are used for this turn only; chats are not saved to disk. Keep this MVP in the foreground."))
+                    .font(.caption2).foregroundStyle(.secondary)
+                }
+            }.padding(questionFocused ? 8 : 16)
+                .navigationTitle("OpenVision MVP")
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) { Button(model.text("清空", "Clear")) { questionFocused = false; model.clear() } }
+                    ToolbarItem(placement: .topBarTrailing) { Button { questionFocused = false; model.showAccount = true } label: { Image(systemName: "gearshape") }.accessibilityIdentifier("settings.open") }
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button(model.text("完成", "Done")) { questionFocused = false }
+                            .accessibilityIdentifier("conversation.dismiss-keyboard")
+                    }
+                }
+                .sheet(isPresented: $model.showAccount) { settings }
+                .sheet(item: Binding(get: { model.pendingPhoto }, set: { request in
+                    if request == nil, let pending = model.pendingPhoto { model.cancelPhoto(requestID: pending.id) }
+                })) { request in
+                    VStack(spacing: 20) {
+                        Text(model.text("尚未开启相机", "The camera has not started")).font(.headline)
+                            .accessibilityIdentifier("photo.confirmation.title")
+                        Text(model.text("确认后将开启眼镜相机，仅拍摄本次一张照片用于回答。", "Confirm to start the glasses camera and take one photo for this answer."))
+                        Text(request.question).font(.callout)
+                        Button(model.text("确认拍一张", "Confirm one photo")) { model.confirmPhoto(requestID: request.id) }
+                            .buttonStyle(.borderedProminent).accessibilityIdentifier("photo.confirm")
+                        Button(model.text("取消拍照", "Cancel photo"), role: .cancel) { model.cancelPhoto(requestID: request.id) }
+                            .accessibilityIdentifier("photo.cancel")
+                        Button(model.text("停止", "Stop")) { model.stop() }
+                            .accessibilityIdentifier("photo.stop")
+                    }.padding().presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
+                }
+                .onChange(of: model.showAccount) { _, presented in
+                    if presented { model.stop() }
+                }
+                #if DEBUG
+                .onChange(of: questionFocused) { _, focused in questionFocusObserver?(focused) }
+                #endif
+        }
+    }
+
+    private var settings: some View {
+        NavigationStack {
+            Form {
+                Section("ChatGPT") {
+                    if account.isSignedIn {
+                        Text(account.accountLabel)
+                        Button(model.text("刷新模型", "Refresh models")) { Task { await model.refreshModels() } }
+                        if !model.models.isEmpty {
+                            Picker(model.text("模型", "Model"), selection: $model.modelID) { ForEach(model.models) { Text($0.name).tag($0.id) } }
+                        }
+                        Button(model.text("退出登录", "Sign out"), role: .destructive) { Task { await model.signOut() } }
+                    } else {
+                        Button(model.text("恢复本机已有登录", "Restore saved sign-in")) { Task { await model.restoreAccount() } }.disabled(model.signingIn).accessibilityIdentifier("account.restore")
+                        Button("Continue with ChatGPT") { Task { await model.connectAccount() } }.disabled(model.signingIn)
+                    }
+                    if account.needsLocalCleanupRetry {
+                        Button(model.text("重试清理本机登录", "Retry local sign-in cleanup")) {
+                            Task { await model.retryLocalCleanup() }
+                        }.disabled(model.signingIn)
+                    }
+                    if let notice = account.signOutNotice { Text(notice).font(.caption) }
+                    Link(model.text("管理订阅用量及应用连接", "Manage plan usage and app connections"), destination: URL(string: "https://chatgpt.com/#settings/Usage")!)
+                    Text(model.text("请在授权与用量页核对套餐及已有 credits 的使用设置。不会自动切换到其他 API 后端。", "Review plan and available-credit usage in the authorization and usage pages. No automatic switch to another API backend.")).font(.caption)
+                }
+                GlassesInputSettingsView(service: glassesInputs, language: model.language)
+                Section(model.text("眼镜", "Glasses")) {
+                    Button(model.text("连接／注册眼镜", "Connect / register glasses")) { setup { try await glasses.register() } }
+                        .disabled(!glasses.sdkAvailable)
+                        .accessibilityIdentifier("glasses.register")
+                    Button(model.text("安装／更新官方开发组件", "Install / update developer component")) { setup { try await glasses.installDeveloperComponent() } }
+                        .disabled(!glasses.sdkAvailable)
+                        .accessibilityIdentifier("glasses.developer.install")
+                    Button(model.text("授权眼镜相机", "Authorize glasses camera")) { setup {
+                        let granted = try await glasses.authorizeCamera()
+                        model.status = granted ? model.text("眼镜相机已授权。", "Glasses camera authorized.") : model.text("相机授权被拒绝，请在 Meta AI 中检查权限。", "Camera permission denied. Review permissions in Meta AI.")
+                    } }
+                    .disabled(!glasses.sdkAvailable)
+                    .accessibilityIdentifier("glasses.camera.authorize")
+                    Text(glasses.sdkAvailable
+                         ? model.text("这些操作会打开官方 Meta AI App。", "These actions open the official Meta AI app.")
+                         : model.glassesSetupMessage).font(.caption)
+                }
+                Section(model.text("语音", "Speech")) {
+                    Toggle(model.text("使用蓝牙麦克风（请连接眼镜）", "Use Bluetooth microphone (connect glasses)"), isOn: $model.useGlassesMicrophone)
+                        .onChange(of: model.useGlassesMicrophone) { _, _ in model.stop() }
+                    Text(model.text("收音时会显示实际输入设备。请断开其他蓝牙耳机，以确认使用眼镜；关闭后使用 iPhone 麦克风。", "The actual input is shown while listening. Disconnect other Bluetooth headsets to verify glasses input. Turn off to use the iPhone microphone.")).font(.caption)
+                }
+                Section { Text(model.status).font(.caption) }
+            }.navigationTitle(model.text("设置", "Settings"))
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button(model.text("完成", "Done")) { model.showAccount = false } } }
+                .safeAreaInset(edge: .bottom) {
+                    Button(model.text("返回对话", "Back to conversation")) { model.showAccount = false }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("settings.close")
+                        .padding()
+                        .background(.regularMaterial)
+                }
+        }
+    }
+
+    private func setup(_ action: @escaping @MainActor () async throws -> Void) {
+        model.stop()
+        Task {
+            do { try await action() }
+            catch { model.status = model.text("设置未完成，请检查 Meta AI 中的开发者模式和连接。", "Setup did not finish. Check Developer Mode and the connection in Meta AI.") }
+        }
+    }
+}

@@ -1,0 +1,4 @@
+"NSMicrophoneUsageDescription" = "Listen to your questions through your selected microphone.";
+"NSSpeechRecognitionUsageDescription" = "Transcribe Chinese or English questions for the assistant.";
+"NSBluetoothAlwaysUsageDescription" = "Connect to your Meta glasses for requested photos and audio.";
+"NSLocalNetworkUsageDescription" = "Connect to your glasses over Wi-Fi and finish sign-in on this device.";
